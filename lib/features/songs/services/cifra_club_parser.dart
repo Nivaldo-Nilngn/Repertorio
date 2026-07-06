@@ -1,0 +1,155 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
+
+class CifraClubParser {
+  static Future<String> fetchAndParse(String url) async {
+    final proxyUrl = 'https://corsproxy.io/?' + Uri.encodeComponent(url);
+    try {
+      final response = await http.get(Uri.parse(proxyUrl));
+      if (response.statusCode == 200) {
+        final htmlContent = response.body;
+        return parseHtmlToChordPro(htmlContent);
+      }
+      throw Exception('Failed to fetch page');
+    } catch (e) {
+      throw Exception('Error parsing Cifra Club: \$e');
+    }
+  }
+
+  static String parseHtmlToChordPro(String htmlContent) {
+    final document = html_parser.parse(htmlContent);
+
+    // Extract Metadata
+    final titleElement = document.querySelector('.t1');
+    final artistElement = document.querySelector('.t3');
+    final keyElement = document.querySelector('#cifra_tom a');
+
+    final title = titleElement?.text.trim() ?? 'Unknown Title';
+    final artist = artistElement?.text.trim() ?? 'Unknown Artist';
+    final key = keyElement?.text.trim() ?? 'C';
+
+    String videoUrl = '';
+    final iframe = document.querySelector('iframe[src*="youtube.com"]');
+    if (iframe != null) {
+      videoUrl = iframe.attributes['src'] ?? '';
+    } else {
+      final thumb = document.querySelector('[data-youtube-id]');
+      if (thumb != null) {
+        final ytId = thumb.attributes['data-youtube-id'];
+        if (ytId != null && ytId.isNotEmpty) {
+          videoUrl = 'https://www.youtube.com/watch?v=$ytId';
+        }
+      }
+    }
+
+    // Extract Cifra (Pre block)
+    final preElement = document.querySelector('.cifra_cnt pre');
+    if (preElement == null) {
+      throw Exception('Could not find the lyrics/chords block.');
+    }
+
+    // Convert to ChordPro
+    final chordProLines = <String>[];
+    chordProLines.add('{title: $title}');
+    chordProLines.add('{artist: $artist}');
+    chordProLines.add('{key: $key}');
+    if (videoUrl.isNotEmpty) {
+      chordProLines.add('{video: $videoUrl}');
+    }
+    chordProLines.add('{tempo: 70}'); // default tempo
+    chordProLines.add('');
+
+    // To parse properly, we need to read the raw HTML inside the <pre> tag,
+    // where chords are in <b> tags.
+    final rawHtml = preElement.innerHtml;
+    // Split by newlines
+    final lines = rawHtml.split('\n');
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+
+      // A simple heuristic: if a line has <b> tags, it's likely a chord line.
+      // Cifra Club puts chords in <b> tags. e.g. <b>C</b>
+      if (line.contains('<b>') || line.contains('</b>')) {
+        // We will try to merge this chord line with the next lyric line
+        // Only merge if the next line is NOT empty!
+        if (i + 1 < lines.length && !lines[i + 1].contains('<b>') && _stripHtmlTags(lines[i + 1]).trim().isNotEmpty) {
+          final lyricLine = _stripHtmlTags(lines[i + 1]);
+          final mergedLine = _mergeChordsAndLyrics(line, lyricLine);
+          chordProLines.add(mergedLine);
+          i++; // Skip the next line since we merged it
+        } else {
+          // If the next line is also a chord line or there are no more lines, just output the chords inline
+          chordProLines.add(_convertChordLineToChordPro(line));
+        }
+      } else {
+        // Just a normal lyric line
+        chordProLines.add(_stripHtmlTags(line));
+      }
+    }
+
+    return chordProLines.join('\n');
+  }
+
+  static String _stripHtmlTags(String html) {
+    final document = html_parser.parse(html);
+    return document.body?.text ?? '';
+  }
+
+  static String _convertChordLineToChordPro(String chordLineHtml) {
+    // Replace <b>C</b> with [C]
+    return chordLineHtml
+        .replaceAllMapped(RegExp(r'<b>(.*?)</b>'), (match) => '[${match.group(1)}]')
+        .replaceAll(RegExp(r'<[^>]*>'), ''); // strip other tags
+  }
+
+  static String _mergeChordsAndLyrics(String chordLineHtml, String lyricLine) {
+    // This is a naive merge. We find the index of each <b> tag, 
+    // extract the chord, and insert it into the lyric string at that visual index.
+    
+    // First, let's find all chords and their visual positions in the chord line.
+    // We strip tags to find visual position, but we need to track where the tags were.
+    
+    List<Map<String, dynamic>> chords = [];
+    int visualPosition = 0;
+    
+    // Regex to match either a <b>chord</b> or text
+    final regex = RegExp(r'(<b>.*?</b>)|([^<]+)');
+    for (final match in regex.allMatches(chordLineHtml)) {
+      final text = match.group(0)!;
+      if (text.startsWith('<b>')) {
+        final chord = text.replaceAll('<b>', '').replaceAll('</b>', '');
+        chords.add({'chord': chord, 'pos': visualPosition});
+        visualPosition += chord.length;
+      } else {
+        // just spaces or text
+        visualPosition += text.length;
+      }
+    }
+
+    // Now insert the chords into the lyric line from back to front to avoid index shifting
+    String result = lyricLine;
+    // Pad the lyric line if it's too short
+    if (chords.isNotEmpty) {
+      final maxPos = chords.last['pos'] as int;
+      if (result.length < maxPos) {
+        result = result.padRight(maxPos, ' ');
+      }
+    }
+
+    for (var i = chords.length - 1; i >= 0; i--) {
+      final chord = chords[i]['chord'] as String;
+      final pos = chords[i]['pos'] as int;
+      
+      if (pos < result.length) {
+        result = result.substring(0, pos) + '[$chord]' + result.substring(pos);
+      } else {
+        result += '[$chord]';
+      }
+    }
+
+    return result;
+  }
+}
