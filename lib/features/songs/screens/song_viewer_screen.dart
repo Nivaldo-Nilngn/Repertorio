@@ -104,6 +104,120 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       _scrollSpeed = (_scrollSpeed + delta).clamp(0.5, 5.0);
     });
   }
+
+  Widget _buildAutoScrollOverlay() {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHigh.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 24,
+            spreadRadius: 2,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Pause / Resume
+          Tooltip(
+            message: 'Pausar rolagem',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: _toggleAutoScroll,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.pause, size: 22, color: colors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Speed down
+          Tooltip(
+            message: 'Diminuir velocidade',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _changeScrollSpeed(-0.5),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.remove, size: 18, color: colors.onSurface),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Slider
+          SizedBox(
+            width: 130,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                activeTrackColor: colors.primary,
+                inactiveTrackColor: colors.outlineVariant.withOpacity(0.4),
+                thumbColor: colors.primary,
+              ),
+              child: Slider(
+                value: _scrollSpeed,
+                min: 0.5,
+                max: 5.0,
+                divisions: 18,
+                onChanged: (v) => setState(() => _scrollSpeed = v),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Speed up
+          Tooltip(
+            message: 'Aumentar velocidade',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _changeScrollSpeed(0.5),
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerHighest,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.add, size: 18, color: colors.onSurface),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          // Close / Stop auto-scroll
+          Tooltip(
+            message: 'Parar rolagem automática',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: _toggleAutoScroll,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.errorContainer.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.close, size: 18, color: colors.onErrorContainer),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   
   void _changeFontSize(double delta) {
     _fontSize.value = (_fontSize.value + delta).clamp(10.0, 48.0);
@@ -127,17 +241,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          setState(() {
-            _showChordsPanel = !_showChordsPanel;
-          });
-        },
-        icon: const Icon(Icons.queue_music),
-        label: const Text('Acordes'),
-        backgroundColor: colors.surfaceContainerHighest,
-        foregroundColor: colors.onSurface,
-      ),
       body: SafeArea(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,60 +248,82 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             // 1. Left Sidebar
             if (widget.hideAppBar && !widget.isPreviewMode) _buildLeftSidebar(),
 
-            // 2. Center Content (Lyrics) & Right Column (Video)
+            // 2. Center Content (Lyrics) & Floating Right Column (Chords Panel)
             Expanded(
               flex: 3,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(top: 48.0, bottom: 100.0, left: 32.0, right: 32.0),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1024),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    if (widget.hideAppBar) _buildDesktopHeader(),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: AnimatedBuilder(
-                            animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
-                            builder: (context, _) => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (widget.hideAppBar) _buildActionButtons(),
-                                if (widget.hideAppBar) const SizedBox(height: 24),
-                                _buildTransposeIndicator(),
-                                const SizedBox(height: 24),
-                                _buildLyricsContent(),
-                              ],
-                            ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.only(top: 48.0, bottom: 100.0, left: 32.0, right: 32.0),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1024),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (widget.hideAppBar) _buildDesktopHeader(),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        // Actions and indicators will go here without the duplicate buttons
+                                        AnimatedBuilder(
+                                          animation: _transposeSteps,
+                                          builder: (context, _) => _buildTransposeIndicator(),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: AnimatedBuilder(
+                                            animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                                            builder: (context, _) => _buildLyricsContent(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (_parsedSong.video.isNotEmpty) ...[
+                                    const SizedBox(width: 32),
+                                    SizedBox(
+                                      width: 300,
+                                      child: _buildVideoPlaceholder(),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        if (_parsedSong.video.isNotEmpty) ...[
-                          const SizedBox(width: 32),
-                          SizedBox(
-                            width: 300,
-                            child: _buildVideoPlaceholder(),
-                          ),
-                        ],
-                      ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  if (_showChordsPanel)
+                    Positioned(
+                      top: 0,
+                      bottom: 0,
+                      right: 0,
+                      child: AnimatedBuilder(
+                        animation: Listenable.merge([_transposeSteps, _instrument]),
+                        builder: (context, _) => _buildRightSidebar(),
+                      ),
+                    ),
+                  // Floating auto-scroll speed control
+                  if (_isAutoScrolling)
+                    Positioned(
+                      bottom: 24,
+                      left: 0,
+                      right: 0,
+                      child: Center(child: _buildAutoScrollOverlay()),
+                    ),
+                ],
               ),
             ),
-          ),
-        ),
-
-            // 3. Right Sidebar (Chords Panel)
-            if (_showChordsPanel)
-              AnimatedBuilder(
-                animation: Listenable.merge([_transposeSteps, _instrument]),
-                builder: (context, _) => _buildRightSidebar(),
-              ),
           ],
         ),
       ),
@@ -233,24 +358,52 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 _buildSidebarButton(Icons.edit_note, 'Simplificar cifra', () {}),
                 _buildSidebarButton(Icons.unfold_more, 'Auto rolagem', _toggleAutoScroll, isActive: _isAutoScrolling),
                 
+                _buildSidebarButton(
+                  widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  widget.isFavorite ? 'Cifra favorita' : 'Favoritar cifra',
+                  widget.onFavoriteToggle ?? () {},
+                  isActive: widget.isFavorite,
+                  activeColor: Colors.orange,
+                ),
+                _buildSidebarButton(Icons.share, 'Compartilhar', () {
+                  final url = html.window.location.href;
+                  html.window.navigator.clipboard?.writeText(url);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Link da cifra copiado para a área de transferência!'),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }),
+                
                 // Font Size button custom
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colors.onSurfaceVariant,
-                      side: BorderSide(color: colors.outlineVariant),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      alignment: Alignment.center,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        InkWell(onTap: () => _changeFontSize(-2), child: const Text('A-', style: TextStyle(fontWeight: FontWeight.bold))),
-                        const Text('Texto', style: TextStyle(fontWeight: FontWeight.normal)),
-                        InkWell(onTap: () => _changeFontSize(2), child: const Text('A+', style: TextStyle(fontWeight: FontWeight.bold))),
+                        IconButton(
+                          icon: const Icon(Icons.remove, size: 16),
+                          tooltip: 'Diminuir Fonte',
+                          onPressed: () => _changeFontSize(-2),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        const Text('Texto', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                        IconButton(
+                          icon: const Icon(Icons.add, size: 16),
+                          tooltip: 'Aumentar Fonte',
+                          onPressed: () => _changeFontSize(2),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ],
                     ),
                   ),
@@ -259,21 +412,30 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 // Transpose button custom
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8.0),
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colors.onSurfaceVariant,
-                      side: BorderSide(color: colors.outlineVariant),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      alignment: Alignment.center,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        InkWell(onTap: () => _transposeSteps.value--, child: const Icon(Icons.remove, size: 16)),
-                        const Text('½ Tom', style: TextStyle(fontWeight: FontWeight.normal)),
-                        InkWell(onTap: () => _transposeSteps.value++, child: const Icon(Icons.add, size: 16)),
+                        IconButton(
+                          icon: const Icon(Icons.remove, size: 16),
+                          tooltip: 'Diminuir Tom',
+                          onPressed: () => _transposeSteps.value--,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        const Text('½ Tom', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                        IconButton(
+                          icon: const Icon(Icons.add, size: 16),
+                          tooltip: 'Aumentar Tom',
+                          onPressed: () => _transposeSteps.value++,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                        ),
                       ],
                     ),
                   ),
@@ -300,7 +462,9 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 _buildSidebarButton(Icons.edit, 'Corrigir', () {
                   ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
                 }),
-                _buildSidebarButton(Icons.print, 'Imprimir', () {}),
+                _buildSidebarButton(Icons.print, 'Imprimir', () {
+                  html.window.print();
+                }),
               ],
             ),
           ),
@@ -405,17 +569,18 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
 
-  Widget _buildSidebarButton(IconData icon, String label, VoidCallback onTap, {bool isActive = false}) {
+  Widget _buildSidebarButton(IconData icon, String label, VoidCallback onTap, {bool isActive = false, Color? activeColor}) {
     final colors = Theme.of(context).colorScheme;
+    final displayColor = isActive ? (activeColor ?? colors.primary) : colors.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: Icon(icon, size: 18, color: isActive ? colors.primary : colors.onSurfaceVariant),
-        label: Text(label, style: TextStyle(color: isActive ? colors.primary : colors.onSurfaceVariant)),
+        icon: Icon(icon, size: 18, color: displayColor),
+        label: Text(label, style: TextStyle(color: displayColor)),
         style: OutlinedButton.styleFrom(
-          backgroundColor: isActive ? colors.primaryContainer.withOpacity(0.3) : Colors.transparent,
-          side: BorderSide(color: isActive ? colors.primary : colors.outlineVariant.withOpacity(0.5)),
+          backgroundColor: isActive ? (activeColor ?? colors.primary).withOpacity(0.15) : Colors.transparent,
+          side: BorderSide(color: isActive ? (activeColor ?? colors.primary) : colors.outlineVariant.withOpacity(0.5)),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           alignment: Alignment.center, // Center aligned like Cifra Club
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -438,7 +603,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         .toList();
 
     return Container(
-      color: colors.surfaceContainerLowest,
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(-4, 0),
+          ),
+        ],
+        border: Border(
+          left: BorderSide(color: colors.outlineVariant.withOpacity(0.5)),
+        ),
+      ),
       width: 280,
       child: SafeArea(
         child: Padding(
@@ -474,6 +651,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   : ListView(
                       children: transposedChords
                           .map((chord) => Padding(
+                                key: ValueKey('${chord}_${_instrument.value}'),
                                 padding: const EdgeInsets.only(bottom: 24.0),
                                 child: Column(
                                   children: [
@@ -574,42 +752,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Wrap(
-      spacing: 16,
-      runSpacing: 8,
-      children: [
-        OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.verified, size: 18),
-          label: const Text('Cifra: Principal (Violão e Guitarra)', style: TextStyle(fontWeight: FontWeight.bold)),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: colorScheme.onSurface,
-            side: BorderSide(color: colorScheme.outlineVariant),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-        ),
-        OutlinedButton.icon(
-          onPressed: widget.onFavoriteToggle,
-          icon: Icon(widget.isFavorite ? Icons.favorite : Icons.favorite_border, size: 18),
-          label: Text(widget.isFavorite ? 'Cifra favorita' : 'Favoritar Cifra', style: const TextStyle(fontWeight: FontWeight.bold)),
-          style: widget.isFavorite
-              ? OutlinedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.orange),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                )
-              : OutlinedButton.styleFrom(
-                  foregroundColor: colorScheme.onSurface,
-                  side: BorderSide(color: colorScheme.outlineVariant),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-        ),
-      ],
-    );
-  }
+  // Removed duplicate _buildActionButtons method
 
   String _extractYoutubeId(String url) {
     final uri = Uri.tryParse(url);
@@ -640,10 +783,17 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
 
   Widget _buildLyricsContent() {
-    return Column(
+    final stopwatch = Stopwatch()..start();
+    
+    final widgetList = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: _parsedSong.lines.map((line) => _buildLine(line)).toList(),
     );
+    
+    stopwatch.stop();
+    debugPrint('MusiCifras Debug: Cifra renderizada em ${stopwatch.elapsedMicroseconds} µs (${stopwatch.elapsedMilliseconds} ms)');
+    
+    return widgetList;
   }
 
   Widget _buildLine(SongLine line) {
@@ -678,102 +828,92 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       );
     }
 
-    // Check if the line has no sung words (only brackets/section markers or spaces)
-    final lyricsWithoutBrackets = line.lyrics.replaceAll(RegExp(r'\[.*?\]'), '').trim();
-    final isInline = lyricsWithoutBrackets.isEmpty;
+    // Check if the line has no sung words (empty lyrics meaning chord-only line)
+    final isInline = line.isInline;
 
     if (isInline) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8.0),
-        child: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: _buildInlineBlocks(line, colorScheme),
+      final chordsString = _buildInlineChordsString(line).replaceAll(' ', '\u00A0');
+
+      // Extract a section label (e.g. "[Intro]") from the raw lyrics if present
+      final sectionMatch = RegExp(r'\[([^\]]+)\]').firstMatch(line.lyrics);
+      final sectionLabel = sectionMatch != null ? '[${sectionMatch.group(1)}]' : null;
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (sectionLabel != null)
+              Text(
+                sectionLabel,
+                style: TextStyle(
+                  fontFamily: 'Consolas',
+                  fontSize: _fontSize.value,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            Text(
+              chordsString,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                fontSize: _fontSize.value,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.end,
-        children: _buildChordBlocks(line, colorScheme),
-      ),
-    );
+    return _buildChordLineWidget(line, colorScheme);
   }
 
-  List<Widget> _buildInlineBlocks(SongLine line, ColorScheme colorScheme) {
-    List<Widget> blocks = [];
+  String _buildInlineChordsString(SongLine line) {
+    final chordsBuffer = StringBuffer();
     int currentLyricIndex = 0;
-    
+    // Remove section markers like [Intro], [Verso], [Ponte] from lyrics
+    // before using segments as spacing — they are labels, not lyrics.
+    final sectionPattern = RegExp(r'\[[^\]]+\]\s*');
+
     for (int i = 0; i < line.chords.length; i++) {
       final chordPos = line.chords[i];
-      
+
       if (chordPos.index > currentLyricIndex) {
-        blocks.add(
-          Text(
-            line.lyrics.substring(currentLyricIndex, chordPos.index).replaceAll(' ', '\u00A0'),
-            style: TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: _fontSize.value,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        );
+        final rawSegment = line.lyrics.substring(currentLyricIndex, chordPos.index);
+        // Strip section labels; pad with spaces to keep chord alignment
+        final cleanSegment = rawSegment.replaceAll(sectionPattern, '');
+        chordsBuffer.write(' ' * cleanSegment.length);
         currentLyricIndex = chordPos.index;
       }
-      
+
       final displayChord = ChordTransposer.transpose(chordPos.chord, _transposeSteps.value);
-
-      blocks.add(
-        Padding(
-          padding: const EdgeInsets.only(right: 8.0),
-          child: Text(
-            displayChord,
-            style: TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: _fontSize.value,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-            ),
-          ),
-        ),
-      );
+      chordsBuffer.write(displayChord);
+      chordsBuffer.write(' ');
+      currentLyricIndex = chordPos.index;
     }
-    
+
     if (currentLyricIndex < line.lyrics.length) {
-      blocks.add(
-        Text(
-          line.lyrics.substring(currentLyricIndex).replaceAll(' ', '\u00A0'),
-          style: TextStyle(
-            fontFamily: 'Consolas',
-            fontSize: _fontSize.value,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      );
+      final remaining = line.lyrics.substring(currentLyricIndex).replaceAll(sectionPattern, '');
+      chordsBuffer.write(remaining);
     }
 
-    return blocks;
+    return chordsBuffer.toString();
   }
 
-  List<Widget> _buildChordBlocks(SongLine line, ColorScheme colorScheme) {
-    List<Widget> blocks = [];
+  Widget _buildChordLineWidget(SongLine line, ColorScheme colorScheme) {
+    final chordsBuffer = StringBuffer();
+    final lyricsBuffer = StringBuffer();
     int currentLyricIndex = 0;
     
     for (int i = 0; i < line.chords.length; i++) {
       final chordPos = line.chords[i];
       
       if (chordPos.index > currentLyricIndex) {
-        blocks.add(
-          Text(
-            line.lyrics.substring(currentLyricIndex, chordPos.index),
-            style: TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: _fontSize.value,
-              color: colorScheme.onSurface,
-            ),
-          ),
-        );
+        final segment = line.lyrics.substring(currentLyricIndex, chordPos.index);
+        lyricsBuffer.write(segment);
+        chordsBuffer.write(' ' * segment.length);
         currentLyricIndex = chordPos.index;
       }
       
@@ -781,54 +921,55 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       String lyricSegment = line.lyrics.substring(currentLyricIndex, nextChordIndex);
       
       final displayChord = ChordTransposer.transpose(chordPos.chord, _transposeSteps.value);
-
-      // Pad the lyric segment if the chord is wider, so chords don't touch each other
+      
+      int padLength = 0;
       if (displayChord.length >= lyricSegment.length) {
-        lyricSegment = lyricSegment.padRight(displayChord.length + 1, '\u00A0');
+        padLength = (displayChord.length + 1) - lyricSegment.length;
       }
-      // Replace normal spaces with non-breaking spaces so Flutter Text layout doesn't trim trailing spaces
-      lyricSegment = lyricSegment.replaceAll(' ', '\u00A0');
-
-      blocks.add(
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              displayChord,
-              style: TextStyle(
-                fontFamily: 'Consolas',
-                fontSize: _fontSize.value,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary, // Using primary theme color for chords!
-              ),
-            ),
-            Text(
-              lyricSegment.isEmpty ? '\u00A0' : lyricSegment,
-              style: TextStyle(
-                fontFamily: 'Consolas',
-                fontSize: _fontSize.value,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-      );
+      
+      chordsBuffer.write(displayChord);
+      chordsBuffer.write(' ' * (lyricSegment.length + padLength - displayChord.length));
+      
+      lyricsBuffer.write(lyricSegment);
+      lyricsBuffer.write(' ' * padLength);
+      
       currentLyricIndex = nextChordIndex;
     }
     
     if (currentLyricIndex < line.lyrics.length) {
-      blocks.add(
-        Text(
-          line.lyrics.substring(currentLyricIndex),
-          style: TextStyle(
-            fontFamily: 'Consolas',
-            fontSize: _fontSize.value,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      );
+      final segment = line.lyrics.substring(currentLyricIndex);
+      lyricsBuffer.write(segment);
+      chordsBuffer.write(' ' * segment.length);
     }
 
-    return blocks;
+    final chordsString = chordsBuffer.toString().replaceAll(' ', '\u00A0');
+    final lyricsString = lyricsBuffer.toString().replaceAll(' ', '\u00A0');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            chordsString,
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: _fontSize.value,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.primary,
+            ),
+          ),
+          Text(
+            lyricsString,
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: _fontSize.value,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

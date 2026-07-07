@@ -25,6 +25,7 @@ class _ChordApiViewerState extends State<ChordApiViewer> {
         ..width = '100%'
         ..height = '100%'
         ..style.border = 'none'
+        ..style.setProperty('pointer-events', 'none')
         ..srcdoc = '''
           <!DOCTYPE html>
           <html>
@@ -73,7 +74,16 @@ class _ChordApiViewerState extends State<ChordApiViewer> {
       height: widget.instrument == 'guitar' ? 140 : 80,
       width: double.infinity,
       color: Colors.white,
-      child: HtmlElementView(viewType: _viewType),
+      child: Stack(
+        children: [
+          HtmlElementView(viewType: _viewType),
+          Positioned.fill(
+            child: Container(
+              color: Colors.transparent,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

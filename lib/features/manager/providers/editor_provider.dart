@@ -24,3 +24,17 @@ class IsEditorVisibleNotifier extends Notifier<bool> {
 final isEditorVisibleProvider = NotifierProvider<IsEditorVisibleNotifier, bool>(() {
   return IsEditorVisibleNotifier();
 });
+
+class SelectedSongIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? id) {
+    state = id;
+  }
+}
+
+final selectedSongIdProvider = NotifierProvider<SelectedSongIdNotifier, String?>(() {
+  return SelectedSongIdNotifier();
+});
+

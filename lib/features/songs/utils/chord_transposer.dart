@@ -7,8 +7,14 @@ class ChordTransposer {
     'C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'
   ];
 
+  static final Map<String, String> _cache = {};
+
   static String transpose(String chord, int steps) {
     if (steps == 0) return chord;
+    
+    final cacheKey = '${chord}_$steps';
+    final cached = _cache[cacheKey];
+    if (cached != null) return cached;
     
     // Extract the root note and the rest of the chord
     final match = RegExp(r'^([CDEFGAB][#b]?)(.*)').firstMatch(chord);
@@ -45,6 +51,8 @@ class ChordTransposer {
       finalModifier = '${parts[0]}/$transposedBass';
     }
 
-    return newRoot + finalModifier;
+    final result = newRoot + finalModifier;
+    _cache[cacheKey] = result;
+    return result;
   }
 }

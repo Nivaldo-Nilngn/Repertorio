@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../widgets/edit_workspace.dart';
 import '../widgets/arrange_workspace.dart';
 import '../widgets/artists_workspace.dart';
@@ -24,29 +26,67 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          backgroundColor: colors.surface,
-          title: const Text('Adicionar Música'),
+          backgroundColor: const Color(0xFF171f33),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.add_circle, color: colors.primary),
+              const SizedBox(width: 12),
+              const Text('Nova Música', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: Icon(Icons.auto_fix_high, color: colors.primary),
-                title: const Text('Importar do Cifra Club (Mágica)'),
-                subtitle: const Text('Cole a URL da cifra para converter automaticamente'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showImportDialog();
-                },
+              const Text(
+                'Como você deseja adicionar a nova música ao seu repertório?',
+                style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
-              const Divider(),
-              ListTile(
-                leading: Icon(Icons.edit_note, color: colors.primary),
-                title: const Text('Criar Manualmente'),
-                subtitle: const Text('Escreva sua própria cifra no editor'),
-                onTap: () {
-                  Navigator.pop(context);
-                  // Reset editor state
-                  ref.read(editingChordProProvider.notifier).state = '''{title: Nova Música}
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showImportDialog();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withOpacity(0.08),
+                          border: Border.all(color: colors.primary.withOpacity(0.3), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.auto_fix_high, color: colors.primary, size: 36),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Importar de Link',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Cifra Club (Mágica)',
+                              style: TextStyle(color: Colors.white54, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        ref.read(selectedSongIdProvider.notifier).select(null);
+                        ref.read(editingChordProProvider.notifier).state = '''{title: Nova Música}
 {artist: Artista}
 {key: C}
 {tempo: 70}
@@ -55,17 +95,47 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 Coloque sua [C]letra aqui
 E os acordes [G]entre colchetes
 ''';
-                  ref.read(isEditorVisibleProvider.notifier).state = true;
-                  ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                  ref.read(songFilterProvider.notifier).clear();
-                },
+                        ref.read(isEditorVisibleProvider.notifier).state = true;
+                        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                        ref.read(songFilterProvider.notifier).clear();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: colors.onSurfaceVariant.withOpacity(0.05),
+                          border: Border.all(color: colors.outline.withOpacity(0.2), width: 1.5),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_note, color: colors.onSurfaceVariant, size: 36),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Criar Manual',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Escrever no Editor',
+                              style: TextStyle(color: Colors.white54, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('CANCELAR'),
+              child: const Text('CANCELAR', style: TextStyle(color: Colors.white54)),
             ),
           ],
         );
@@ -124,6 +194,7 @@ E os acordes [G]entre colchetes
                             final chordPro = await CifraClubParser.fetchAndParse(url);
                             
                             // Update editor state
+                            ref.read(selectedSongIdProvider.notifier).select(null);
                             ref.read(editingChordProProvider.notifier).state = chordPro;
                             ref.read(isEditorVisibleProvider.notifier).state = true;
                             
@@ -156,25 +227,67 @@ E os acordes [G]entre colchetes
     );
   }
 
+  void _showLogoutDialog() {
+    final colors = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF171f33),
+          title: const Text('Confirmar Saída', style: TextStyle(color: Colors.white)),
+          content: const Text('Deseja realmente sair da sua conta?', style: TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CANCELAR', style: TextStyle(color: Colors.white54)),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await FirebaseAuth.instance.signOut();
+              },
+              style: FilledButton.styleFrom(backgroundColor: colors.error),
+              child: const Text('SAIR'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeTab = ref.watch(sidebarTabProvider);
+    final user = ref.watch(authStateProvider).value;
+    final displayName = user?.displayName ?? user?.email?.split('@').first ?? 'Usuário';
+    final email = user?.email ?? 'Sem e-mail';
+    final photoUrl = user?.photoURL;
+
+    // Auto-collapse sidebar when a song is selected to prioritize screen space
+    ref.listen<String?>(selectedSongIdProvider, (previous, next) {
+      if (next != null) {
+        setState(() {
+          _collapseMainSidebar = true;
+        });
+      }
+    });
+
+    // Auto-collapse sidebar when editor becomes visible
+    ref.listen<bool>(isEditorVisibleProvider, (previous, next) {
+      if (next) {
+        setState(() {
+          _collapseMainSidebar = true;
+        });
+      }
+    });
 
     return Scaffold(
-      body: Column(
+      body: Row(
         children: [
-          _buildTopNavBar(context),
+          _buildSingleSidebar(context, activeTab, displayName, email, photoUrl),
           Expanded(
-            child: Row(
-              children: [
-                _buildSingleSidebar(context, activeTab),
-                Expanded(
-                  child: _buildMainWorkspace(activeTab),
-                ),
-              ],
-            ),
+            child: _buildMainWorkspace(activeTab),
           ),
-          _buildBottomFooter(context),
         ],
       ),
     );
@@ -192,111 +305,193 @@ E os acordes [G]entre colchetes
     }
   }
 
-  Widget _buildTopNavBar(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: colors.surface,
-        border: Border(bottom: BorderSide(color: colors.outline)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Text(
-                'SongbookPro Manager',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              IconButton(icon: const Icon(Icons.share), color: colors.onSurfaceVariant, onPressed: () {}),
-              IconButton(icon: const Icon(Icons.fullscreen), color: colors.onSurfaceVariant, onPressed: () {}),
-              const SizedBox(width: 16),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.print, size: 18),
-                label: const Text('ENVIAR'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: _showImportDialog,
-                icon: const Icon(Icons.auto_fix_high, size: 18),
-                label: const Text('MÁGICA'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: colors.onPrimary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: colors.surfaceContainerHighest,
-                child: const Icon(Icons.person, size: 20),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSingleSidebar(BuildContext context, SidebarTab activeTab) {
+  Widget _buildSingleSidebar(BuildContext context, SidebarTab activeTab, String displayName, String email, String? photoUrl) {
     final colors = Theme.of(context).colorScheme;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
       width: _collapseMainSidebar ? 72 : 280,
       decoration: BoxDecoration(
         color: const Color(0xFF171f33), // surfaceContainer
         border: Border(right: BorderSide(color: colors.outline)),
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(_collapseMainSidebar ? 8.0 : 16.0),
-            child: Row(
-              mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
-              children: [
-                InkWell(
-                  onTap: () => setState(() => _collapseMainSidebar = !_collapseMainSidebar),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: colors.primaryContainer,
-                    foregroundColor: colors.onPrimaryContainer,
-                    child: _collapseMainSidebar
-                        ? const Icon(Icons.menu, size: 20)
-                        : const Text('MC', style: TextStyle(fontWeight: FontWeight.bold)),
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: _collapseMainSidebar ? 72 : 280,
+          maxWidth: _collapseMainSidebar ? 72 : 280,
+          child: SizedBox(
+            width: _collapseMainSidebar ? 72 : 280,
+            child: Column(
+            children: [
+              // App Logo / Title
+              Padding(
+                padding: EdgeInsets.all(_collapseMainSidebar ? 12.0 : 20.0),
+                child: Row(
+                  mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
+                  children: [
+                    // Logo Badge with Gradient and Glow
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colors.primary,
+                            colors.primary.withRed(150), // Subtle gradient shift
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.primary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.music_note_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    if (!_collapseMainSidebar) ...[
+                      const SizedBox(width: 14),
+                      // Styled MusiCifras Text
+                      RichText(
+                        text: TextSpan(
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
+                              ),
+                          children: [
+                            const TextSpan(
+                              text: 'Musi',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                            TextSpan(
+                              text: 'Cifras',
+                              style: TextStyle(
+                                color: colors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Colors.white10),
+              // User Profile Section wrapped in a clean glass card
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: _collapseMainSidebar ? 8.0 : 16.0,
+                  vertical: 12.0,
+                ),
+                child: Container(
+                  padding: EdgeInsets.all(_collapseMainSidebar ? 6.0 : 12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: _collapseMainSidebar
+                        ? MainAxisAlignment.center
+                        : MainAxisAlignment.start,
+                    children: [
+                      // User Photo / Initials
+                      InkWell(
+                        onTap: _showLogoutDialog,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: colors.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: photoUrl != null
+                              ? Image.network(
+                                  photoUrl,
+                                  width: 36,
+                                  height: 36,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Center(
+                                      child: Text(
+                                        displayName.isNotEmpty
+                                            ? displayName.substring(0, 1).toUpperCase()
+                                            : 'U',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: colors.onPrimaryContainer,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Center(
+                                  child: Text(
+                                    displayName.isNotEmpty
+                                        ? displayName.substring(0, 1).toUpperCase()
+                                        : 'U',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: colors.onPrimaryContainer,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if (!_collapseMainSidebar) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant.withOpacity(0.7),
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.logout, size: 18, color: Colors.redAccent),
+                          tooltip: 'Sair da Conta',
+                          onPressed: _showLogoutDialog,
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (!_collapseMainSidebar) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('MusiCifras', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-                        Text('Gerenciador', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colors.onSurfaceVariant), overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.menu_open, size: 20),
-                    onPressed: () => setState(() => _collapseMainSidebar = true),
-                    color: colors.onSurfaceVariant,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ],
-            ),
-          ),
+              ),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 8.0 : 16.0, vertical: 8.0),
             child: OutlinedButton(
@@ -335,15 +530,32 @@ E os acordes [G]entre colchetes
             padding: const EdgeInsets.all(8.0),
             child: Column(
               children: [
-                _buildSidebarActionItem(Icons.settings, 'Configurações', colors),
-                _buildSidebarActionItem(Icons.account_circle, 'Conta', colors),
+                _buildSidebarActionItem(Icons.settings, 'Configurações', colors, () {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configurações em breve!'), duration: Duration(seconds: 1)));
+                }),
+                const SizedBox(height: 8),
+                IconButton(
+                  icon: Icon(
+                    _collapseMainSidebar ? Icons.chevron_right : Icons.chevron_left,
+                    color: colors.onSurfaceVariant,
+                    size: 24,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _collapseMainSidebar = !_collapseMainSidebar;
+                    });
+                  },
+                ),
               ],
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+    ),
+  ),
+);
+}
 
   Widget _buildSidebarItem(IconData icon, String title, SidebarTab tab, ColorScheme colors, SidebarTab activeTab) {
     final isActive = activeTab == tab;
@@ -388,11 +600,9 @@ E os acordes [G]entre colchetes
     );
   }
 
-  Widget _buildSidebarActionItem(IconData icon, String title, ColorScheme colors) {
+  Widget _buildSidebarActionItem(IconData icon, String title, ColorScheme colors, VoidCallback onTap) {
     return InkWell(
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$title em breve!'), duration: const Duration(seconds: 1)));
-      },
+      onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         margin: const EdgeInsets.only(bottom: 4),
@@ -409,36 +619,6 @@ E os acordes [G]entre colchetes
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildBottomFooter(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      color: colors.surfaceContainerHigh,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.circle, color: colors.secondary, size: 10),
-              const SizedBox(width: 8),
-              Text('SYNC ATIVO', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(width: 16),
-              Container(width: 1, height: 16, color: colors.outline),
-              const SizedBox(width: 16),
-              Text('TOM: ORIGINAL', style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(width: 16),
-              Text('ROLANDO: OFF', style: Theme.of(context).textTheme.labelSmall),
-            ],
-          ),
-          Row(
-            children: const [],
-          ),
-        ],
       ),
     );
   }

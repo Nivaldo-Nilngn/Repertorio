@@ -18,8 +18,14 @@ class SongLine {
   final String lyrics;
   final List<ChordPosition> chords;
   final String? type; // Ex: 'comment'
+  final bool isInline;
 
-  SongLine({required this.lyrics, required this.chords, this.type});
+  SongLine({
+    required this.lyrics,
+    required this.chords,
+    this.type,
+    this.isInline = false,
+  });
 }
 
 class ChordPosition {
@@ -75,8 +81,8 @@ class ChordProParser {
         String chordText = match.group(1)!;
         final lowerText = chordText.toLowerCase();
         
-        // If it's too long, has spaces, or matches known section names, treat as lyrics/section marker.
-        if (chordText.contains(' ') || chordText.length > 8 || lowerText == 'intro' || lowerText == 'solo' || lowerText == 'refrão' || lowerText == 'refrao' || lowerText == 'chorus' || lowerText == 'verse') {
+        final knownSections = {'intro', 'introdução', 'introducao', 'solo', 'refrão', 'refrao', 'chorus', 'verse', 'ponte', 'bridge', 'final', 'fim', 'outro', 'instrumental', 'inst', 'interlúdio', 'interludio', 'pre-chorus', 'pre-refrão', 'pre-refrao'};
+        if (chordText.contains(' ') || chordText.length > 8 || knownSections.contains(lowerText)) {
           lyrics += line.substring(lastMatchEnd, match.end);
           currentLyricsIndex += (match.end - lastMatchEnd);
         } else {
@@ -93,7 +99,9 @@ class ChordProParser {
       }
       lyrics += line.substring(lastMatchEnd);
 
-      lines.add(SongLine(lyrics: lyrics, chords: chords));
+      final lyricsWithoutBrackets = lyrics.replaceAll(RegExp(r'\[.*?\]'), '').trim();
+      final isInlineLine = chords.isNotEmpty && lyricsWithoutBrackets.isEmpty;
+      lines.add(SongLine(lyrics: lyrics, chords: chords, isInline: isInlineLine));
     }
 
     return ParsedSong(
