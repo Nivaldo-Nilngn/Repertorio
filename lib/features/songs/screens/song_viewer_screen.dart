@@ -8,7 +8,6 @@ import '../widgets/chord_api_viewer.dart';
 import '../utils/chord_pro_parser.dart';
 import '../utils/chord_transposer.dart';
 import '../../manager/providers/editor_provider.dart';
-import '../../manager/providers/manager_providers.dart';
 import '../repositories/song_repository.dart';
 
 class SongViewerScreen extends ConsumerStatefulWidget {
@@ -236,7 +235,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
 
     return Scaffold(
       key: _scaffoldKey,
