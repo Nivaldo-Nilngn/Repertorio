@@ -360,7 +360,7 @@ E os acordes [G]entre colchetes
                     ),
                     if (!_collapseMainSidebar) ...[
                       const SizedBox(width: 14),
-                      // Styled MusiCifras Text
+                      // Styled KordApp Text
                       RichText(
                         text: TextSpan(
                           style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -369,11 +369,11 @@ E os acordes [G]entre colchetes
                               ),
                           children: [
                             const TextSpan(
-                              text: 'Musi',
+                              text: 'Kord',
                               style: TextStyle(color: Colors.white),
                             ),
                             TextSpan(
-                              text: 'Cifras',
+                              text: 'App',
                               style: TextStyle(
                                 color: colors.primary,
                                 fontWeight: FontWeight.bold,

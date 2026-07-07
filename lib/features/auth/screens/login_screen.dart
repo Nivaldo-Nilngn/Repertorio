@@ -181,7 +181,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'MusiCifras',
+                            'KordApp',
                             style: GoogleFonts.outfit(
                               fontSize: 32,
                               fontWeight: FontWeight.bold,

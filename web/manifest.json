@@ -1,11 +1,11 @@
 {
-    "name": "musicifras",
-    "short_name": "musicifras",
+    "name": "KordApp",
+    "short_name": "KordApp",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "KordApp - Seu cifrador digital",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

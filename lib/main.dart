@@ -21,18 +21,18 @@ void main() async {
     ),
   );
 
-  runApp(const ProviderScope(child: MusiCifrasApp()));
+  runApp(const ProviderScope(child: KordApp()));
 }
 
-class MusiCifrasApp extends ConsumerWidget {
-  const MusiCifrasApp({super.key});
+class KordApp extends ConsumerWidget {
+  const KordApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
 
     return MaterialApp(
-      title: 'MusiCifras',
+      title: 'KordApp',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.managerTheme,
       home: authState.when(
