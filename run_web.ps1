@@ -13,7 +13,7 @@ Get-Content $envFile | Where-Object { $_ -match "^[^#].+=.+" } | ForEach-Object 
 }
 
 $dartDefines = ($env_vars.GetEnumerator() | ForEach-Object {
-    "--dart-define=$($_.Key)=$($_.Value)"
+    "--dart-define=""$($_.Key)=$($_.Value)"""
 }) -join " "
 
 $cmd = "flutter run -d chrome $dartDefines"

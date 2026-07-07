@@ -21,13 +21,13 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
-    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN'),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
-    appId: String.fromEnvironment('FIREBASE_APP_ID'),
-    databaseURL: String.fromEnvironment('FIREBASE_DATABASE_URL'),
+    apiKey: String.fromEnvironment('FIREBASE_API_KEY') == '' ? 'dummy-api-key' : String.fromEnvironment('FIREBASE_API_KEY'),
+    authDomain: String.fromEnvironment('FIREBASE_AUTH_DOMAIN') == '' ? null : String.fromEnvironment('FIREBASE_AUTH_DOMAIN'),
+    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID') == '' ? 'dummy-project-id' : String.fromEnvironment('FIREBASE_PROJECT_ID'),
+    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET') == '' ? null : String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
+    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID') == '' ? 'dummy-sender-id' : String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
+    appId: String.fromEnvironment('FIREBASE_APP_ID') == '' ? 'dummy-app-id' : String.fromEnvironment('FIREBASE_APP_ID'),
+    databaseURL: String.fromEnvironment('FIREBASE_DATABASE_URL') == '' ? null : String.fromEnvironment('FIREBASE_DATABASE_URL'),
   );
 
   static const FirebaseOptions android = FirebaseOptions(
