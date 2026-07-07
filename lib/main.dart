@@ -11,9 +11,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
+  const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  const appId = String.fromEnvironment('FIREBASE_APP_ID');
 
-  // Detecta build sem --dart-define (ex: flutter run sem flags)
-  if (apiKey.isEmpty) {
+  // Detecta build sem as variáveis de ambiente necessárias (ex: flutter run sem flags ou Netlify sem env vars)
+  if (apiKey.isEmpty || projectId.isEmpty || appId.isEmpty) {
     runApp(const _MissingConfigApp());
     return;
   }
