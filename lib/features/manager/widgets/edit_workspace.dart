@@ -409,7 +409,478 @@ E os acordes [G]entre colchetes
     } else if (filter.artist != null) {
       filterLabel = filter.artist;
     }
-    
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        if (isMobile) {
+          return _buildMobileLayout(
+            context,
+            colors,
+            filteredSongs,
+            setlists,
+            selectedSongId,
+            isEditorVisible,
+            showPreview,
+            currentSavedSong,
+            isSaved,
+            titleLabel,
+            filterLabel,
+          );
+        }
+        return _buildDesktopLayout(
+          colors,
+          filteredSongs,
+          setlists,
+          selectedSongId,
+          isEditorVisible,
+          showPreview,
+          currentSavedSong,
+          isSaved,
+          titleLabel,
+          filterLabel,
+          activeTab,
+          filter,
+        );
+      },
+    );
+  }
+
+  // ─── MOBILE LAYOUT ───────────────────────────────────────────────────────────
+
+  Widget _buildMobileLayout(
+    BuildContext context,
+    ColorScheme colors,
+    List<Song> filteredSongs,
+    List<SongSetlist> setlists,
+    String? selectedSongId,
+    bool isEditorVisible,
+    bool showPreview,
+    Song? currentSavedSong,
+    bool isSaved,
+    String titleLabel,
+    String? filterLabel,
+  ) {
+    // If editor is open on mobile, show full-screen editor
+    if (isEditorVisible) {
+      return _buildMobileEditor(context, colors, currentSavedSong, isSaved, setlists);
+    }
+
+    // Otherwise show full-screen list
+    return _buildMobileSongList(
+      context, colors, filteredSongs, setlists, selectedSongId,
+      currentSavedSong, titleLabel, filterLabel,
+    );
+  }
+
+  Widget _buildMobileSongList(
+    BuildContext context,
+    ColorScheme colors,
+    List<Song> filteredSongs,
+    List<SongSetlist> setlists,
+    String? selectedSongId,
+    Song? currentSavedSong,
+    String titleLabel,
+    String? filterLabel,
+  ) {
+    return Container(
+      color: const Color(0xFF0A0F1E),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            color: const Color(0xFF1E293B),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      titleLabel,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    if (filterLabel != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colors.primary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: colors.primary.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              filterLabel,
+                              style: TextStyle(color: colors.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => ref.read(songFilterProvider.notifier).clear(),
+                              child: Icon(Icons.close, size: 14, color: colors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: colors.outline.withOpacity(0.3)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: ref.watch(songFilterProvider).folderId,
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF171f33),
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      hint: const Text('Todos os Repertórios', style: TextStyle(color: Colors.white30, fontSize: 12)),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Todos os Repertórios'),
+                        ),
+                        ...setlists.map((s) => DropdownMenuItem<String?>(
+                              value: s.id,
+                              child: Text(s.name),
+                            )),
+                      ],
+                      onChanged: (newFolderId) {
+                        ref.read(songFilterProvider.notifier).setFolder(newFolderId);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Songs list
+          Expanded(
+            child: ref.watch(songListProvider).when(
+              data: (_) {
+                if (filteredSongs.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.music_note_rounded, size: 64, color: colors.primary.withOpacity(0.3)),
+                          const SizedBox(height: 16),
+                          const Text('Nenhuma música encontrada.', style: TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: () {
+                              ref.read(selectedSongIdProvider.notifier).select(null);
+                              ref.read(isEditorVisibleProvider.notifier).state = true;
+                            },
+                            child: const Text('Criar Nova Música'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  itemCount: filteredSongs.length,
+                  itemBuilder: (context, index) {
+                    final song = filteredSongs[index];
+                    final isActive = selectedSongId == song.id;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: InkWell(
+                        onTap: () {
+                          ref.read(selectedSongIdProvider.notifier).select(song.id);
+                          ref.read(editingChordProProvider.notifier).state = song.content;
+                          // On mobile: push song viewer screen
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (ctx) => _MobileSongViewerPage(
+                                song: song,
+                                chordProText: song.content,
+                                onFavoriteToggle: () {
+                                  final updated = song.copyWith(isFavorite: !song.isFavorite);
+                                  ref.read(songRepositoryProvider).updateSong(updated);
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? colors.primary.withOpacity(0.12)
+                                : const Color(0xFF131b2e),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border(
+                              left: BorderSide(
+                                color: isActive ? colors.primary : Colors.transparent,
+                                width: 3.5,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      song.title,
+                                      style: TextStyle(
+                                        fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                                        color: isActive ? Colors.white : colors.onSurface,
+                                        fontSize: 15,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      song.artist,
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? colors.primary.withOpacity(0.8)
+                                            : colors.onSurfaceVariant.withOpacity(0.7),
+                                        fontSize: 13,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (song.isFavorite)
+                                Icon(Icons.favorite, size: 16, color: colors.primary.withOpacity(0.7)),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2d3449),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  song.key,
+                                  style: const TextStyle(color: Colors.white54, fontSize: 11, fontFamily: 'Consolas'),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.chevron_right, color: colors.onSurfaceVariant.withOpacity(0.5), size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, s) => Center(child: Text('Erro: $e')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileEditor(
+    BuildContext context,
+    ColorScheme colors,
+    Song? currentSavedSong,
+    bool isSaved,
+    List<SongSetlist> setlists,
+  ) {
+    return Container(
+      color: colors.surfaceContainer,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            color: colors.surfaceContainer,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, size: 20),
+                      tooltip: 'Voltar para a Lista',
+                      onPressed: () {
+                        ref.read(isEditorVisibleProvider.notifier).state = false;
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Text('EDITOR', style: Theme.of(context).textTheme.labelSmall),
+                  ],
+                ),
+                isSaved
+                    ? TextButton.icon(onPressed: null, icon: const Icon(Icons.check, size: 16), label: const Text('SALVO'))
+                    : TextButton.icon(onPressed: _saveToFirebase, icon: const Icon(Icons.cloud_upload, size: 16), label: const Text('SALVAR')),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Título da música',
+                      hintStyle: TextStyle(color: Colors.white54),
+                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _artistController,
+                    style: const TextStyle(fontSize: 14, color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'Artista',
+                      hintStyle: TextStyle(color: Colors.white54),
+                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Tom: ', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      DropdownButton<String>(
+                        value: _selectedKey,
+                        dropdownColor: colors.surfaceContainerHigh,
+                        style: const TextStyle(color: Colors.white),
+                        underline: Container(height: 1, color: Colors.white24),
+                        items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+                            .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _selectedKey = v);
+                            _onFieldChanged();
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _videoUrlController,
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                    decoration: const InputDecoration(
+                      hintText: 'URL do Vídeo (YouTube) — opcional',
+                      hintStyle: TextStyle(color: Colors.white54),
+                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Text('Repertório: ', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      Expanded(
+                        child: DropdownButton<String?>(
+                          value: currentSavedSong?.folderId ?? _selectedFolderId,
+                          isExpanded: true,
+                          dropdownColor: colors.surfaceContainerHigh,
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          underline: Container(height: 1, color: Colors.white24),
+                          items: [
+                            const DropdownMenuItem<String?>(value: null, child: Text('Nenhum')),
+                            ...setlists.map((col) => DropdownMenuItem<String?>(
+                                  value: col.id,
+                                  child: Text(col.name),
+                                )),
+                          ],
+                          onChanged: (v) async {
+                            setState(() => _selectedFolderId = v);
+                            if (currentSavedSong != null) {
+                              final updated = currentSavedSong.copyWith(folderId: v);
+                              await ref.read(songRepositoryProvider).updateSong(updated);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Toolbar
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        TextButton(onPressed: () => _insertText('{c: Intro}\n'), child: const Text('Intro')),
+                        TextButton(onPressed: () => _insertText('{c: Chorus}\n'), child: const Text('Chorus')),
+                        TextButton(onPressed: () => _insertText('{c: Verse}\n'), child: const Text('Verse')),
+                        TextButton(onPressed: () => _insertText('[]'), child: const Text('Acordes')),
+                      ],
+                    ),
+                  ),
+                  // Content field (fixed height)
+                  Container(
+                    height: 400,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colors.outline.withOpacity(0.2)),
+                      color: colors.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: TextField(
+                      controller: _contentController,
+                      maxLines: null,
+                      expands: true,
+                      style: const TextStyle(
+                        fontFamily: 'Consolas',
+                        fontSize: 13,
+                        color: Colors.white,
+                        height: 1.5,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'Cole a letra e os acordes aqui...',
+                        hintStyle: TextStyle(color: Colors.white30),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── DESKTOP LAYOUT ──────────────────────────────────────────────────────────
+
+  Widget _buildDesktopLayout(
+    ColorScheme colors,
+    List<Song> filteredSongs,
+    List<SongSetlist> setlists,
+    String? selectedSongId,
+    bool isEditorVisible,
+    bool showPreview,
+    Song? currentSavedSong,
+    bool isSaved,
+    String titleLabel,
+    String? filterLabel,
+    SidebarTab activeTab,
+    SongFilter filter,
+  ) {
     return Row(
       children: [
         // Left Column: Songs List
@@ -850,6 +1321,31 @@ E os acordes [G]entre colchetes
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Mobile Song Viewer Page ─────────────────────────────────────────────────
+
+class _MobileSongViewerPage extends ConsumerWidget {
+  final Song song;
+  final String chordProText;
+  final VoidCallback onFavoriteToggle;
+
+  const _MobileSongViewerPage({
+    required this.song,
+    required this.chordProText,
+    required this.onFavoriteToggle,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SongViewerScreen(
+      chordProText: chordProText,
+      hideAppBar: false,
+      isPreviewMode: false,
+      isFavorite: song.isFavorite,
+      onFavoriteToggle: onFavoriteToggle,
     );
   }
 }

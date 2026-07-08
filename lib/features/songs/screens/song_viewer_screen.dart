@@ -235,7 +235,139 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
 
+    // On mobile (hideAppBar=false), show a proper full-screen page with AppBar
+    if (!widget.hideAppBar) {
+      return Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: const Color(0xFF0A0F1E),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF171f33),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _parsedSong.title.isNotEmpty ? _parsedSong.title : 'Música',
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Text(
+                _parsedSong.artist.isNotEmpty ? _parsedSong.artist : '',
+                style: TextStyle(color: colors.primary, fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+          actions: [
+            // Favorite toggle
+            if (widget.onFavoriteToggle != null)
+              IconButton(
+                icon: Icon(
+                  widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: widget.isFavorite ? Colors.orange : Colors.white70,
+                ),
+                onPressed: widget.onFavoriteToggle,
+                tooltip: widget.isFavorite ? 'Remover dos favoritos' : 'Favoritar',
+              ),
+            // Auto-scroll toggle
+            IconButton(
+              icon: Icon(
+                _isAutoScrolling ? Icons.pause_circle : Icons.play_circle_outline,
+                color: _isAutoScrolling ? colors.primary : Colors.white70,
+              ),
+              onPressed: _toggleAutoScroll,
+              tooltip: 'Auto rolagem',
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Transpose indicator
+                  AnimatedBuilder(
+                    animation: _transposeSteps,
+                    builder: (context, _) => _buildTransposeIndicator(),
+                  ),
+                  const SizedBox(height: 8),
+                  // Font size + transpose controls row
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // Font controls
+                        _buildMobileControl(
+                          icon: Icons.text_decrease,
+                          label: 'A-',
+                          onTap: () => _changeFontSize(-2),
+                          colors: colors,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMobileControl(
+                          icon: Icons.text_increase,
+                          label: 'A+',
+                          onTap: () => _changeFontSize(2),
+                          colors: colors,
+                        ),
+                        const SizedBox(width: 16),
+                        // Transpose controls
+                        _buildMobileControl(
+                          icon: Icons.arrow_downward,
+                          label: '½ Tom ↓',
+                          onTap: () => _transposeSteps.value--,
+                          colors: colors,
+                        ),
+                        const SizedBox(width: 8),
+                        _buildMobileControl(
+                          icon: Icons.arrow_upward,
+                          label: '½ Tom ↑',
+                          onTap: () => _transposeSteps.value++,
+                          colors: colors,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Video if present
+                  if (_parsedSong.video.isNotEmpty) ...[
+                    _buildVideoPlaceholder(),
+                    const SizedBox(height: 16),
+                  ],
+                  // Lyrics
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                      builder: (context, _) => _buildLyricsContent(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Auto-scroll overlay
+            if (_isAutoScrolling)
+              Positioned(
+                bottom: 24,
+                left: 0,
+                right: 0,
+                child: Center(child: _buildAutoScrollOverlay()),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Desktop layout (hideAppBar=true)
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
@@ -324,6 +456,22 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMobileControl({required IconData icon, required String label, required VoidCallback onTap, required ColorScheme colors}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colors.outline.withOpacity(0.3)),
+        ),
+        child: Text(label, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w500)),
       ),
     );
   }

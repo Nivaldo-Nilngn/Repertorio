@@ -260,7 +260,6 @@ E os acordes [G]entre colchetes
     final activeTab = ref.watch(sidebarTabProvider);
     final user = ref.watch(authStateProvider).value;
     final displayName = user?.displayName ?? user?.email?.split('@').first ?? 'Usuário';
-    final email = user?.email ?? 'Sem e-mail';
     final photoUrl = user?.photoURL;
 
     // Auto-collapse sidebar when a song is selected to prioritize screen space
@@ -281,6 +280,174 @@ E os acordes [G]entre colchetes
       }
     });
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        if (isMobile) {
+          return _buildMobileLayout(context, activeTab, displayName, photoUrl);
+        } else {
+          return _buildDesktopLayout(context, activeTab, displayName, user?.email ?? '', photoUrl);
+        }
+      },
+    );
+  }
+
+  // ─── MOBILE LAYOUT ───────────────────────────────────────────────────────────
+
+  Widget _buildMobileLayout(BuildContext context, SidebarTab activeTab, String displayName, String? photoUrl) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0F1E),
+      appBar: _buildMobileAppBar(context, activeTab, displayName, photoUrl, colors),
+      body: _buildMainWorkspace(activeTab),
+      bottomNavigationBar: _buildBottomNav(activeTab, colors),
+      floatingActionButton: _buildFAB(activeTab, colors),
+    );
+  }
+
+  PreferredSizeWidget _buildMobileAppBar(
+    BuildContext context,
+    SidebarTab activeTab,
+    String displayName,
+    String? photoUrl,
+    ColorScheme colors,
+  ) {
+    final tabTitles = {
+      SidebarTab.songs: 'Músicas',
+      SidebarTab.prepare: 'Repertórios',
+      SidebarTab.artists: 'Artistas',
+      SidebarTab.favorites: 'Favoritos',
+    };
+
+    return AppBar(
+      backgroundColor: const Color(0xFF171f33),
+      elevation: 0,
+      titleSpacing: 16,
+      title: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'lib/core/assets/kordapp_icon_192x192/screen.png',
+              width: 32,
+              height: 32,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(width: 10),
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+              children: [
+                const TextSpan(text: 'Kord', style: TextStyle(color: Colors.white)),
+                TextSpan(text: 'App', style: TextStyle(color: colors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        GestureDetector(
+          onTap: _showLogoutDialog,
+          child: Container(
+            margin: const EdgeInsets.only(right: 12),
+            child: CircleAvatar(
+              radius: 16,
+              backgroundColor: colors.primaryContainer,
+              backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+              child: photoUrl == null
+                  ? Text(
+                      displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : 'U',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: colors.onPrimaryContainer,
+                        fontSize: 13,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomNav(SidebarTab activeTab, ColorScheme colors) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF171f33),
+        border: Border(top: BorderSide(color: colors.outline.withOpacity(0.3))),
+      ),
+      child: BottomNavigationBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        selectedItemColor: colors.primary,
+        unselectedItemColor: colors.onSurfaceVariant,
+        selectedFontSize: 11,
+        unselectedFontSize: 10,
+        type: BottomNavigationBarType.fixed,
+        currentIndex: _tabToIndex(activeTab),
+        onTap: (index) => _onBottomNavTap(index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Músicas'),
+          BottomNavigationBarItem(icon: Icon(Icons.playlist_play), label: 'Repertórios'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Artistas'),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favoritos'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFAB(SidebarTab activeTab, ColorScheme colors) {
+    // Only show FAB on songs/favorites tabs (where adding a song makes sense)
+    if (activeTab != SidebarTab.songs && activeTab != SidebarTab.favorites) {
+      return const SizedBox.shrink();
+    }
+    return FloatingActionButton(
+      onPressed: _showAddSongDialog,
+      backgroundColor: colors.primary,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      child: const Icon(Icons.add),
+    );
+  }
+
+  int _tabToIndex(SidebarTab tab) {
+    switch (tab) {
+      case SidebarTab.songs:
+        return 0;
+      case SidebarTab.prepare:
+        return 1;
+      case SidebarTab.artists:
+        return 2;
+      case SidebarTab.favorites:
+        return 3;
+    }
+  }
+
+  void _onBottomNavTap(int index) {
+    switch (index) {
+      case 0:
+        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+        ref.read(songFilterProvider.notifier).clear();
+        break;
+      case 1:
+        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.prepare);
+        break;
+      case 2:
+        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.artists);
+        break;
+      case 3:
+        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.favorites);
+        ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
+        break;
+    }
+  }
+
+  // ─── DESKTOP LAYOUT ──────────────────────────────────────────────────────────
+
+  Widget _buildDesktopLayout(BuildContext context, SidebarTab activeTab, String displayName, String email, String? photoUrl) {
     return Scaffold(
       body: Row(
         children: [
@@ -292,6 +459,8 @@ E os acordes [G]entre colchetes
       ),
     );
   }
+
+  // ─── SHARED ──────────────────────────────────────────────────────────────────
 
   Widget _buildMainWorkspace(SidebarTab activeTab) {
     switch (activeTab) {
@@ -330,32 +499,14 @@ E os acordes [G]entre colchetes
                 child: Row(
                   mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
                   children: [
-                    // Logo Badge with Gradient and Glow
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colors.primary,
-                            colors.primary.withRed(150), // Subtle gradient shift
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.primary.withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.music_note_rounded,
-                        color: Colors.white,
-                        size: 22,
+                    // Logo Badge with real app icon
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.asset(
+                        'lib/core/assets/kordapp_icon_192x192/screen.png',
+                        width: 38,
+                        height: 38,
+                        fit: BoxFit.contain,
                       ),
                     ),
                     if (!_collapseMainSidebar) ...[

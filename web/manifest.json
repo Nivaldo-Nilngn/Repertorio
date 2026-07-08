@@ -3,9 +3,9 @@
     "short_name": "KordApp",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "KordApp - Seu cifrador digital",
+    "background_color": "#0A0F1E",
+    "theme_color": "#3D6EFE",
+    "description": "KordApp - Seu cifrador digital de músicas",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

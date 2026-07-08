@@ -570,54 +570,366 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     final songAsync = ref.watch(songListProvider);
     final setlistAsync = ref.watch(setlistListProvider);
 
-    return setlistAsync.when(
-      data: (setlists) {
-        if (_activeSetlist == null) {
-          return _buildDashboardView(setlists, colors);
-        }
-        
-        // Sync with active setlist
-        final matchedSetlist = setlists.where((s) => s.id == _activeSetlist!.id).firstOrNull;
-        if (matchedSetlist == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() {
-              _activeSetlist = null;
-              _isDirty = false;
-            });
-          });
-          return _buildDashboardView(setlists, colors);
-        }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
 
-        if (_activeSetlist != matchedSetlist && !_isDirty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() {
-              _activeSetlist = matchedSetlist;
-            });
-          });
-        }
+        return setlistAsync.when(
+          data: (setlists) {
+            if (_activeSetlist == null) {
+              return isMobile
+                  ? _buildMobileDashboard(setlists, colors)
+                  : _buildDashboardView(setlists, colors);
+            }
 
-        return Row(
-          children: [
-            // Left Column: Biblioteca list of songs
-            Container(
-              width: 400,
-              color: const Color(0xFF060e20),
-              child: _buildBibliotecaView(songAsync, colors),
-            ),
-            Container(width: 1, color: colors.outline.withOpacity(0.4)),
-            
-            // Right Column: Active Setlist Details Canvas
-            Expanded(
-              child: Container(
-                color: colors.surface,
-                child: _buildSetlistCanvas(colors),
-              ),
-            ),
-          ],
+            // Sync with active setlist
+            final matchedSetlist = setlists.where((s) => s.id == _activeSetlist!.id).firstOrNull;
+            if (matchedSetlist == null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setState(() {
+                  _activeSetlist = null;
+                  _isDirty = false;
+                });
+              });
+              return isMobile
+                  ? _buildMobileDashboard(setlists, colors)
+                  : _buildDashboardView(setlists, colors);
+            }
+
+            if (_activeSetlist != matchedSetlist && !_isDirty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                setState(() {
+                  _activeSetlist = matchedSetlist;
+                });
+              });
+            }
+
+            if (isMobile) {
+              return _buildMobileEditorView(songAsync, colors);
+            }
+
+            return Row(
+              children: [
+                // Left Column: Biblioteca list of songs
+                Container(
+                  width: 400,
+                  color: const Color(0xFF060e20),
+                  child: _buildBibliotecaView(songAsync, colors),
+                ),
+                Container(width: 1, color: colors.outline.withOpacity(0.4)),
+
+                // Right Column: Active Setlist Details Canvas
+                Expanded(
+                  child: Container(
+                    color: colors.surface,
+                    child: _buildSetlistCanvas(colors),
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (err, stack) => Scaffold(body: Center(child: Text('Erro: $err'))),
         );
       },
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (err, stack) => Scaffold(body: Center(child: Text('Erro: $err'))),
+    );
+  }
+
+  // ─── MOBILE DASHBOARD ────────────────────────────────────────────────────────
+
+  Widget _buildMobileDashboard(List<SongSetlist> setlists, ColorScheme colors) {
+    final sortedSetlists = setlists.reversed.toList();
+    return Container(
+      color: const Color(0xFF0A0F1E),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+            color: const Color(0xFF171f33),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Repertórios',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: colors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                FilledButton.icon(
+                  onPressed: _showCreateSetlistDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Novo'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: sortedSetlists.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.playlist_play, size: 64, color: colors.outline.withOpacity(0.5)),
+                        const SizedBox(height: 16),
+                        Text('Nenhum repertório criado ainda.',
+                            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16)),
+                        const SizedBox(height: 16),
+                        OutlinedButton(
+                          onPressed: _showCreateSetlistDialog,
+                          child: const Text('Criar Meu Primeiro Repertório'),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: sortedSetlists.length,
+                    itemBuilder: (context, index) {
+                      final setlist = sortedSetlists[index];
+                      int totalMinutes = 0;
+                      int songCount = 0;
+                      for (var item in setlist.items) {
+                        if (item.type == 'song') {
+                          totalMinutes += 4;
+                          songCount++;
+                        } else {
+                          final digits = RegExp(r'(\d+)').firstMatch(item.duration);
+                          if (digits != null) totalMinutes += int.parse(digits.group(1)!);
+                        }
+                      }
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF131b2e),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colors.outline.withOpacity(0.2)),
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          title: Text(
+                            setlist.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
+                                  const SizedBox(width: 4),
+                                  Text(setlist.date, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text('$songCount músicas',
+                                        style: TextStyle(color: colors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text('Est. $totalMinutes min',
+                                      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, size: 20),
+                                color: Colors.redAccent.withOpacity(0.8),
+                                onPressed: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: colors.surface,
+                                      title: const Text('Excluir Repertório'),
+                                      content: Text('Excluir "${setlist.name}"?'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR')),
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                          child: const Text('EXCLUIR'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ref.read(songRepositoryProvider).deleteSetlist(setlist.id);
+                                  }
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.arrow_forward_ios, size: 16, color: colors.primary),
+                                onPressed: () {
+                                  setState(() {
+                                    _activeSetlist = setlist;
+                                    _isDirty = false;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── MOBILE EDITOR VIEW (tabs: Roteiro | Biblioteca) ─────────────────────────
+
+  Widget _buildMobileEditorView(AsyncValue<List<Song>> songAsync, ColorScheme colors) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          // Header
+          Container(
+            color: const Color(0xFF171f33),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () => setState(() {
+                          _activeSetlist = null;
+                          _isDirty = false;
+                        }),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _activeSetlist!.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_isDirty)
+                        TextButton.icon(
+                          onPressed: _saveSetlistToFirebase,
+                          icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                          label: const Text('SALVAR'),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle_outline, color: colors.secondary, size: 16),
+                            const SizedBox(width: 4),
+                            Text('SALVO', style: TextStyle(color: colors.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                TabBar(
+                  tabs: const [
+                    Tab(icon: Icon(Icons.list, size: 18), text: 'Roteiro'),
+                    Tab(icon: Icon(Icons.library_music, size: 18), text: 'Biblioteca'),
+                  ],
+                  labelColor: colors.primary,
+                  unselectedLabelColor: colors.onSurfaceVariant,
+                  indicatorColor: colors.primary,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              children: [
+                // Tab 1: Setlist canvas
+                Container(
+                  color: colors.surface,
+                  child: _buildMobileSetlistCanvas(colors),
+                ),
+                // Tab 2: Biblioteca
+                Container(
+                  color: const Color(0xFF060e20),
+                  child: _buildBibliotecaView(songAsync, colors),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileSetlistCanvas(ColorScheme colors) {
+    int totalMinutes = 0;
+    for (var item in _activeSetlist!.items) {
+      if (item.type == 'song') {
+        totalMinutes += 4;
+      } else {
+        final digits = RegExp(r'(\d+)').firstMatch(item.duration);
+        if (digits != null) totalMinutes += int.parse(digits.group(1)!);
+      }
+    }
+    return Column(
+      children: [
+        // Toolbar
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.schedule, size: 14, color: colors.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text('Est. $totalMinutes min',
+                      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                ],
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _addNoteToSetlist,
+                icon: const Icon(Icons.note_add, size: 16),
+                label: const Text('Bloco', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _activeSetlist!.items.isEmpty
+              ? Center(
+                  child: Text(
+                    'Vazio.\nAdicione músicas na aba Biblioteca!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+                  itemCount: _activeSetlist!.items.length,
+                  itemBuilder: (context, index) {
+                    final item = _activeSetlist!.items[index];
+                    return item.type == 'song'
+                        ? _buildSetlistSongItem(index, item, colors)
+                        : _buildSetlistNoteItem(index, item, colors);
+                  },
+                ),
+        ),
+      ],
     );
   }
 
