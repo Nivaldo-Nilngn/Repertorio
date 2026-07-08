@@ -3,12 +3,12 @@ class ChordConverter {
   static String textToChordPro(String text) {
     if (text.isEmpty) return '';
 
-    final lines = text.split('\n');
+    final lines = text.replaceAll('\r', '').split('\n');
     final result = <String>[];
     
     // Simple heuristic: a line is a chord line if it contains mostly chords and spaces.
     // A more robust check might look for valid chord names.
-    final chordLineRegex = RegExp(r'^[\sA-G#b0-9majdimaugMmsusadd\/\(\)\-\+]*$');
+    final chordLineRegex = RegExp(r'^[\sA-G#b0-9majdimaugMmsusadd\/\(\)\-\+\|xX]*$');
     final containsChordRegex = RegExp(r'[A-G]');
 
     for (int i = 0; i < lines.length; i++) {
@@ -27,7 +27,12 @@ class ChordConverter {
           // Just a standalone chord line (or followed by empty line)
           // Convert to [Chord] format
           final words = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
-          result.add(words.map((w) => '[$w]').join(' '));
+          final converted = words.map((w) {
+            if (w == '|') return '|';
+            if (RegExp(r'^\d+x$', caseSensitive: false).hasMatch(w)) return w;
+            return '[$w]';
+          }).join(' ');
+          result.add(converted);
         }
       } else {
         // Just lyrics or an empty line

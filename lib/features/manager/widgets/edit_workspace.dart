@@ -9,6 +9,8 @@ import '../providers/editor_provider.dart';
 import '../providers/manager_providers.dart';
 import '../../songs/utils/chord_converter.dart';
 import '../../songs/services/cifra_club_parser.dart';
+import '../../songs/utils/chord_pro_parser.dart';
+import '../../songs/utils/chord_transposer.dart';
 
 enum ChordFormat { chordPro, text }
 
@@ -131,7 +133,8 @@ class _EditWorkspaceState extends ConsumerState<EditWorkspace> {
     final artist = _artistController.text.trim().isEmpty ? 'Unknown Artist' : _artistController.text.trim();
     final key = _selectedKey == 'Detectar' ? 'C' : _selectedKey;
     
-    final songId = title.toLowerCase().replaceAll(RegExp(r'[\s/.#\$\[\]]+'), '_');
+    final selectedSongId = ref.read(selectedSongIdProvider);
+    final songId = selectedSongId ?? title.toLowerCase().replaceAll(RegExp(r'[\s/.#\$\[\]]+'), '_');
 
     final song = Song(
       id: songId,
@@ -170,6 +173,50 @@ class _EditWorkspaceState extends ConsumerState<EditWorkspace> {
     } else {
       _contentController.text += text;
     }
+  }
+
+  void _transposeEditorContent({required String fromKey, required String toKey}) {
+    if (fromKey == 'Detectar' || toKey == 'Detectar' || fromKey == toKey) return;
+    
+    final notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+    final notesAlt = ['C', 'Db', 'D', 'D#', 'E', 'F', 'Gb', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    int indexFrom = notes.indexOf(fromKey);
+    if (indexFrom == -1) indexFrom = notesAlt.indexOf(fromKey);
+    
+    int indexTo = notes.indexOf(toKey);
+    if (indexTo == -1) indexTo = notesAlt.indexOf(toKey);
+    
+    if (indexFrom == -1 || indexTo == -1) return;
+    
+    int steps = indexTo - indexFrom;
+    if (steps == 0) return;
+    
+    final contentText = _contentController.text;
+    final regex = RegExp(r'\[(.*?)\]');
+    final newContent = contentText.replaceAllMapped(regex, (match) {
+      final chord = match.group(1)!;
+      final transposed = ChordTransposer.transpose(chord, steps);
+      return '[$transposed]';
+    });
+    
+    setState(() {
+      _contentController.text = newContent;
+    });
+  }
+
+  Widget _buildToolbarButton(String label, String textToInsert) {
+    final colors = Theme.of(context).colorScheme;
+    return OutlinedButton(
+      onPressed: () => _insertText(textToInsert),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        foregroundColor: colors.primary,
+        side: BorderSide(color: colors.primary.withOpacity(0.3)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+    );
   }
 
   void _showLocalImportDialog(BuildContext context) {
@@ -224,9 +271,11 @@ class _EditWorkspaceState extends ConsumerState<EditWorkspace> {
 
                           try {
                             final chordPro = await CifraClubParser.fetchAndParse(url);
+                            final parsed = ChordProParser.parse(chordPro);
+                            final roadmapText = SongRoadmapBuilder.convertToRoadmapText(parsed);
                             
                             ref.read(selectedSongIdProvider.notifier).select(null);
-                            ref.read(editingChordProProvider.notifier).state = chordPro;
+                            ref.read(editingChordProProvider.notifier).state = roadmapText;
                             ref.read(isEditorVisibleProvider.notifier).state = true;
                             
                             if (context.mounted) {
@@ -398,7 +447,7 @@ E os acordes [G]entre colchetes
       } catch (_) {}
     }
     
-    final isSaved = currentSavedSong != null;
+    final isSaved = currentSavedSong != null && currentSavedSong.content == _currentChordPro;
 
     // Compute filter text label
     final String titleLabel = activeTab == SidebarTab.favorites ? 'Favoritos' : 'Músicas';
@@ -721,12 +770,14 @@ E os acordes [G]entre colchetes
                       },
                     ),
                     const SizedBox(width: 4),
-                    Text('EDITOR', style: Theme.of(context).textTheme.labelSmall),
+                    Text('EDITOR DE MÚSICA', style: Theme.of(context).textTheme.labelSmall),
                   ],
                 ),
-                isSaved
-                    ? TextButton.icon(onPressed: null, icon: const Icon(Icons.check, size: 16), label: const Text('SALVO'))
-                    : TextButton.icon(onPressed: _saveToFirebase, icon: const Icon(Icons.cloud_upload, size: 16), label: const Text('SALVAR')),
+                TextButton.icon(
+                  onPressed: _saveToFirebase,
+                  icon: const Icon(Icons.cloud_upload, size: 16),
+                  label: const Text('SALVAR'),
+                ),
               ],
             ),
           ),
@@ -738,12 +789,12 @@ E os acordes [G]entre colchetes
                 children: [
                   TextField(
                     controller: _titleController,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                     decoration: const InputDecoration(
-                      hintText: 'Título da música',
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      labelText: 'Título da música',
+                      labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -751,71 +802,79 @@ E os acordes [G]entre colchetes
                     controller: _artistController,
                     style: const TextStyle(fontSize: 14, color: Colors.white),
                     decoration: const InputDecoration(
-                      hintText: 'Artista',
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      labelText: 'Artista / Cantor',
+                      labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Text('Tom: ', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      DropdownButton<String>(
-                        value: _selectedKey,
-                        dropdownColor: colors.surfaceContainerHigh,
-                        style: const TextStyle(color: Colors.white),
-                        underline: Container(height: 1, color: Colors.white24),
-                        items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
-                            .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() => _selectedKey = v);
-                            _onFieldChanged();
-                          }
-                        },
-                      ),
-                    ],
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _videoUrlController,
                     style: const TextStyle(fontSize: 13, color: Colors.white),
                     decoration: const InputDecoration(
-                      hintText: 'URL do Vídeo (YouTube) — opcional',
-                      hintStyle: TextStyle(color: Colors.white54),
-                      border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                      enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                      labelText: 'URL do Vídeo (YouTube)',
+                      labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Text('Repertório: ', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                      Expanded(
-                        child: DropdownButton<String?>(
-                          value: currentSavedSong?.folderId ?? _selectedFolderId,
-                          isExpanded: true,
-                          dropdownColor: colors.surfaceContainerHigh,
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
-                          underline: Container(height: 1, color: Colors.white24),
-                          items: [
-                            const DropdownMenuItem<String?>(value: null, child: Text('Nenhum')),
-                            ...setlists.map((col) => DropdownMenuItem<String?>(
-                                  value: col.id,
-                                  child: Text(col.name),
-                                )),
-                          ],
-                          onChanged: (v) async {
-                            setState(() => _selectedFolderId = v);
-                            if (currentSavedSong != null) {
-                              final updated = currentSavedSong.copyWith(folderId: v);
-                              await ref.read(songRepositoryProvider).updateSong(updated);
-                            }
-                          },
-                        ),
+                  InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Repertório / Coleção',
+                      labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String?>(
+                        value: currentSavedSong?.folderId ?? _selectedFolderId,
+                        isExpanded: true,
+                        dropdownColor: colors.surfaceContainerHigh,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        items: [
+                          const DropdownMenuItem<String?>(value: null, child: Text('Nenhum Repertório')),
+                          ...setlists.map((col) => DropdownMenuItem<String?>(
+                                value: col.id,
+                                child: Text(col.name),
+                              )),
+                        ],
+                        onChanged: (v) async {
+                          setState(() => _selectedFolderId = v);
+                          if (currentSavedSong != null) {
+                            final updated = currentSavedSong.copyWith(folderId: v);
+                            await ref.read(songRepositoryProvider).updateSong(updated);
+                          }
+                        },
                       ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Tom Original',
+                      labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedKey,
+                        isExpanded: true,
+                        dropdownColor: colors.surfaceContainerHigh,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+                            .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            _transposeEditorContent(fromKey: _selectedKey, toKey: v);
+                            setState(() => _selectedKey = v);
+                            _onFieldChanged();
+                          }
+                        },
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   // Toolbar
@@ -823,13 +882,25 @@ E os acordes [G]entre colchetes
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        TextButton(onPressed: () => _insertText('{c: Intro}\n'), child: const Text('Intro')),
-                        TextButton(onPressed: () => _insertText('{c: Chorus}\n'), child: const Text('Chorus')),
-                        TextButton(onPressed: () => _insertText('{c: Verse}\n'), child: const Text('Verse')),
-                        TextButton(onPressed: () => _insertText('[]'), child: const Text('Acordes')),
+                        _buildToolbarButton('Introdução', '[Introdução]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Primeira Parte', '[Primeira Parte]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Pré-refrão', '[Pré-refrão]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Refrão', '[Refrão]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Segunda Parte', '[Segunda Parte]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Ponte', '[Ponte]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('OBS', 'OBS: '),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Compasso ( | )', ' | '),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
                   // Content field (fixed height)
                   Container(
                     height: 400,
@@ -1084,9 +1155,11 @@ E os acordes [G]entre colchetes
                           Text('EDITOR DE MÚSICA', style: Theme.of(context).textTheme.labelSmall),
                         ],
                       ),
-                      isSaved
-                          ? TextButton.icon(onPressed: null, icon: const Icon(Icons.check, size: 16), label: const Text('SALVO NO DB'))
-                          : TextButton.icon(onPressed: _saveToFirebase, icon: const Icon(Icons.cloud_upload, size: 16), label: const Text('SALVAR NO DB')),
+                      TextButton.icon(
+                        onPressed: _saveToFirebase,
+                        icon: const Icon(Icons.cloud_upload, size: 16),
+                        label: const Text('SALVAR NO DB'),
+                      ),
                     ],
                   ),
                 ),
@@ -1096,162 +1169,159 @@ E os acordes [G]entre colchetes
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Title
-                        TextField(
-                          controller: _titleController,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                          decoration: const InputDecoration(
-                            hintText: 'Título da música',
-                            hintStyle: TextStyle(color: Colors.white54),
-                            border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        // Video URL & Key
+                        // Row 1: Title & Artist
                         Row(
                           children: [
                             Expanded(
+                              child: TextField(
+                                controller: _titleController,
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                                decoration: const InputDecoration(
+                                  labelText: 'Título da música',
+                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: TextField(
+                                controller: _artistController,
+                                style: const TextStyle(fontSize: 16, color: Colors.white),
+                                decoration: const InputDecoration(
+                                  labelText: 'Artista / Cantor',
+                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Row 2: Video URL, Collection dropdown, and Original Key dropdown
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
                               child: TextField(
                                 controller: _videoUrlController,
                                 style: const TextStyle(fontSize: 14, color: Colors.white),
                                 decoration: const InputDecoration(
-                                  hintText: 'URL do Vídeo (YouTube)',
-                                  hintStyle: TextStyle(color: Colors.white54),
-                                  border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                                  labelText: 'URL do Vídeo (YouTube)',
+                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 24),
-                            const Text('Tom original: ', style: TextStyle(color: Colors.white70)),
-                            DropdownButton<String>(
-                              value: _selectedKey,
-                              dropdownColor: colors.surfaceContainerHigh,
-                              style: const TextStyle(color: Colors.white),
-                              underline: Container(height: 1, color: Colors.white24),
-                              items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
-                                  .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setState(() => _selectedKey = v);
-                                  _onFieldChanged();
-                                }
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Artist & Format
-                        Row(
-                          children: [
+                            const SizedBox(width: 16),
                             Expanded(
-                              child: TextField(
-                                controller: _artistController,
-                                style: const TextStyle(fontSize: 14, color: Colors.white),
+                              flex: 2,
+                              child: InputDecorator(
                                 decoration: const InputDecoration(
-                                  hintText: 'Artista',
-                                  hintStyle: TextStyle(color: Colors.white54),
-                                  border: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-                                  enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                                  labelText: 'Repertório / Coleção',
+                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Radio<ChordFormat>(
-                                      value: ChordFormat.text,
-                                      groupValue: _format,
-                                      activeColor: colors.primary,
-                                      onChanged: (v) {
-                                        if (v != null) {
-                                          setState(() => _format = v);
-                                          _parseChordProToFields(_currentChordPro);
-                                        }
-                                      },
-                                    ),
-                                    const Text('Acordes sobre Letras', style: TextStyle(color: Colors.white)),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    Radio<ChordFormat>(
-                                      value: ChordFormat.chordPro,
-                                      groupValue: _format,
-                                      activeColor: colors.primary,
-                                      onChanged: (v) {
-                                        if (v != null) {
-                                          setState(() => _format = v);
-                                          _parseChordProToFields(_currentChordPro);
-                                        }
-                                      },
-                                    ),
-                                    const Text('ChordPro', style: TextStyle(color: Colors.white)),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // Collection Selector dropdown
-                        Row(
-                          children: [
-                            const Text('Repertório / Coleção: ', style: TextStyle(color: Colors.white70)),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DropdownButton<String?>(
-                                value: currentSavedSong?.folderId ?? _selectedFolderId,
-                                isExpanded: true,
-                                dropdownColor: colors.surfaceContainerHigh,
-                                style: const TextStyle(color: Colors.white),
-                                underline: Container(height: 1, color: Colors.white24),
-                                items: [
-                                  const DropdownMenuItem<String?>(
-                                    value: null,
-                                    child: Text('Nenhum Repertório'),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String?>(
+                                    value: currentSavedSong?.folderId ?? _selectedFolderId,
+                                    isExpanded: true,
+                                    dropdownColor: colors.surfaceContainerHigh,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    items: [
+                                      const DropdownMenuItem<String?>(value: null, child: Text('Nenhum Repertório')),
+                                      ...setlists.map((col) => DropdownMenuItem<String?>(
+                                            value: col.id,
+                                            child: Text(col.name),
+                                          )),
+                                    ],
+                                    onChanged: (v) async {
+                                      setState(() => _selectedFolderId = v);
+                                      if (currentSavedSong != null) {
+                                        final updated = currentSavedSong.copyWith(folderId: v);
+                                        await ref.read(songRepositoryProvider).updateSong(updated);
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Repertório atualizado!'), backgroundColor: Colors.green),
+                                        );
+                                      }
+                                    },
                                   ),
-                                  ...setlists.map((col) => DropdownMenuItem<String?>(
-                                        value: col.id,
-                                        child: Text(col.name),
-                                      )),
-                                ],
-                                onChanged: (v) async {
-                                  setState(() => _selectedFolderId = v);
-                                  if (currentSavedSong != null) {
-                                    final updated = currentSavedSong.copyWith(folderId: v);
-                                    await ref.read(songRepositoryProvider).updateSong(updated);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Repertório atualizado!'), backgroundColor: Colors.green),
-                                    );
-                                  }
-                                },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 1,
+                              child: InputDecorator(
+                                decoration: const InputDecoration(
+                                  labelText: 'Tom Original',
+                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _selectedKey,
+                                    isExpanded: true,
+                                    dropdownColor: colors.surfaceContainerHigh,
+                                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                                    items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+                                        .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+                                    onChanged: (v) {
+                                      if (v != null) {
+                                        _transposeEditorContent(fromKey: _selectedKey, toKey: v);
+                                        setState(() => _selectedKey = v);
+                                        _onFieldChanged();
+                                      }
+                                    },
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         // Toolbar
                         Row(
                           children: [
-                            TextButton(onPressed: () => _insertText('{c: Intro}\n'), child: const Text('Intro')),
-                            TextButton(onPressed: () => _insertText('{c: Chorus}\n'), child: const Text('Chorus')),
-                            TextButton(onPressed: () => _insertText('{c: Verse}\n'), child: const Text('Verse')),
-                            TextButton(onPressed: () => _insertText('[]'), child: const Text('Acordes')),
-                            const Spacer(),
-                            IconButton(icon: const Icon(Icons.undo, color: Colors.white54), onPressed: () {}),
+                            Expanded(
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildToolbarButton('Introdução', '[Introdução]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Primeira Parte', '[Primeira Parte]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Pré-refrão', '[Pré-refrão]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Refrão', '[Refrão]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Segunda Parte', '[Segunda Parte]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Ponte', '[Ponte]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('OBS', 'OBS: '),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Compasso ( | )', ' | '),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ],
                         ),
+                        const SizedBox(height: 12),
                         // Main content
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
                               border: Border.all(color: colors.outline.withOpacity(0.2)),
                               color: colors.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(8),
                             ),
                             padding: const EdgeInsets.all(12),
                             child: TextField(

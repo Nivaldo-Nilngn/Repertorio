@@ -10,6 +10,8 @@ import '../utils/chord_transposer.dart';
 import '../../manager/providers/editor_provider.dart';
 import '../repositories/song_repository.dart';
 
+enum VideoDisplayState { full, mini, hidden }
+
 class SongViewerScreen extends ConsumerStatefulWidget {
   final String chordProText;
   final bool hideAppBar;
@@ -34,13 +36,18 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   late ParsedSong _parsedSong;
   final ValueNotifier<double> _fontSize = ValueNotifier(16.0);
   final ValueNotifier<int> _transposeSteps = ValueNotifier(0);
-  final ValueNotifier<String> _instrument = ValueNotifier('guitar');
+  final ValueNotifier<String> _instrument = ValueNotifier('piano');
   
   final ScrollController _scrollController = ScrollController();
   Timer? _autoScrollTimer;
   double _scrollSpeed = 1.0;
   bool _isAutoScrolling = false;
   bool _showChordsPanel = false;
+  bool _isRoadmapMode = true;
+  bool _isMultiColumn = false;
+
+  // Video 3-state: full → mini controller → hidden
+  VideoDisplayState _videoState = VideoDisplayState.full;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -51,20 +58,40 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     _registerVideoIframe();
   }
 
+  html.IFrameElement? _youtubeIframe;
+
+  // Track registered view factories across hot restarts
+  static final Set<String> _registeredViewIds = {};
+
   void _registerVideoIframe() {
     if (_parsedSong.video.isNotEmpty) {
       final String viewId = 'youtube-iframe-${_parsedSong.video}';
-      // ignore: undefined_prefixed_name
-      ui_web.platformViewRegistry.registerViewFactory(
-        viewId,
-        (int viewId) => html.IFrameElement()
-          ..width = '100%'
-          ..height = '100%'
-          ..src = 'https://www.youtube.com/embed/${_extractYoutubeId(_parsedSong.video)}'
-          ..style.border = 'none'
-          ..allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-          ..allowFullscreen = true,
-      );
+      final videoId = _extractYoutubeId(_parsedSong.video);
+
+      // Create the iframe element regardless (we always want a fresh reference)
+      _youtubeIframe = html.IFrameElement()
+        ..width = '240'
+        ..height = '135'
+        ..src = 'https://www.youtube.com/embed/$videoId?enablejsapi=1&autoplay=0'
+        ..style.border = 'none'
+        ..style.width = '240px'
+        ..style.height = '135px'
+        ..allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+        ..allowFullscreen = true;
+
+      // Only register the factory once per session (hot restart safe)
+      if (!_registeredViewIds.contains(viewId)) {
+        _registeredViewIds.add(viewId);
+        try {
+          // ignore: undefined_prefixed_name
+          ui_web.platformViewRegistry.registerViewFactory(
+            viewId,
+            (int id) => _youtubeIframe!,
+          );
+        } catch (_) {
+          // Already registered — safe to ignore
+        }
+      }
     }
   }
 
@@ -265,6 +292,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             ],
           ),
           actions: [
+            // View Mode Toggle
+            IconButton(
+              icon: Icon(
+                _isRoadmapMode ? Icons.notes : Icons.grid_view,
+                color: _isRoadmapMode ? colors.primary : Colors.white70,
+              ),
+              onPressed: () {
+                setState(() {
+                  _isRoadmapMode = !_isRoadmapMode;
+                });
+              },
+              tooltip: _isRoadmapMode ? 'Ver Cifra Completa' : 'Ver Mapa do Arranjo',
+            ),
             // Favorite toggle
             if (widget.onFavoriteToggle != null)
               IconButton(
@@ -294,10 +334,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Transpose indicator
+                  // Metadata cards (Tom & Ritmo)
                   AnimatedBuilder(
                     animation: _transposeSteps,
-                    builder: (context, _) => _buildTransposeIndicator(),
+                    builder: (context, _) => _buildTomBadge(),
                   ),
                   const SizedBox(height: 8),
                   // Font size + transpose controls row
@@ -338,18 +378,24 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Video if present
-                  if (_parsedSong.video.isNotEmpty) ...[
+                  // Video if present (mobile - full only)
+                  if (_parsedSong.video.isNotEmpty && _videoState == VideoDisplayState.full) ...[
                     _buildVideoPlaceholder(),
                     const SizedBox(height: 16),
                   ],
-                  // Lyrics
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: AnimatedBuilder(
-                      animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
-                      builder: (context, _) => _buildLyricsContent(),
-                    ),
+                  // Content (Lyrics or Roadmap)
+                  AnimatedBuilder(
+                    animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                    builder: (context, _) {
+                      if (_isRoadmapMode) {
+                        return _buildRoadmapContent();
+                      } else {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: _buildLyricsContent(),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -402,29 +448,22 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        // Actions and indicators will go here without the duplicate buttons
                                         AnimatedBuilder(
-                                          animation: _transposeSteps,
-                                          builder: (context, _) => _buildTransposeIndicator(),
-                                        ),
-                                        const SizedBox(height: 24),
-                                        SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: AnimatedBuilder(
-                                            animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
-                                            builder: (context, _) => _buildLyricsContent(),
-                                          ),
+                                          animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                                          builder: (context, _) {
+                                            if (_isRoadmapMode) {
+                                              return _buildRoadmapContent();
+                                            } else {
+                                              return SingleChildScrollView(
+                                                scrollDirection: Axis.horizontal,
+                                                child: _buildLyricsContent(),
+                                              );
+                                            }
+                                          },
                                         ),
                                       ],
                                     ),
                                   ),
-                                  if (_parsedSong.video.isNotEmpty) ...[
-                                    const SizedBox(width: 32),
-                                    SizedBox(
-                                      width: 300,
-                                      child: _buildVideoPlaceholder(),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ],
@@ -442,6 +481,31 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                         animation: Listenable.merge([_transposeSteps, _instrument]),
                         builder: (context, _) => _buildRightSidebar(),
                       ),
+                    ),
+                  // ── Keep iframe in DOM always when not hidden (audio continuity) ──
+                  if (_parsedSong.video.isNotEmpty && _videoState != VideoDisplayState.hidden)
+                    Positioned(
+                      top: 12,
+                      right: _showChordsPanel ? 320 : 12,
+                      // In mini mode: render iframe invisible (Offstage keeps it in DOM = audio plays)
+                      // In full mode: render iframe visible
+                      child: _videoState == VideoDisplayState.full
+                          ? _buildFloatingVideoPlayer()
+                          : Offstage(
+                              offstage: true,
+                              child: SizedBox(
+                                width: 240,
+                                height: 135,
+                                child: _buildVideoPlaceholder(),
+                              ),
+                            ),
+                    ),
+                  // ── Mini player UI overlay (shown on top when in mini mode) ──
+                  if (_parsedSong.video.isNotEmpty && _videoState == VideoDisplayState.mini)
+                    Positioned(
+                      top: 12,
+                      right: _showChordsPanel ? 320 : 12,
+                      child: _buildMiniVideoController(),
                     ),
                   // Floating auto-scroll speed control
                   if (_isAutoScrolling)
@@ -480,141 +544,241 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     final colors = Theme.of(context).colorScheme;
     
     return Container(
-      width: 220,
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
+      width: 90,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), // Slate-900 matching modern dashboard styles
+        border: Border(right: BorderSide(color: colors.outlineVariant.withOpacity(0.2))),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Artist Profile Picture
-          Center(
-            child: CircleAvatar(
-              radius: 48,
-              backgroundColor: colors.surfaceContainerHighest,
-              child: const Icon(Icons.person, size: 48, color: Colors.white),
-            ),
-          ),
-          const SizedBox(height: 24),
-          
           Expanded(
             child: ListView(
+              physics: const BouncingScrollPhysics(),
               children: [
-                _buildSidebarButton(Icons.edit_note, 'Simplificar cifra', () {}),
-                _buildSidebarButton(Icons.unfold_more, 'Auto rolagem', _toggleAutoScroll, isActive: _isAutoScrolling),
+                _buildSidebarTile(
+                  icon: Icons.auto_fix_high,
+                  label: 'Editar',
+                  onTap: () {
+                    ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
+                  },
+                  isActive: ref.watch(isEditorVisibleProvider),
+                ),
+                _buildSidebarTile(
+                  icon: Icons.unfold_more,
+                  label: 'Rolagem',
+                  onTap: _toggleAutoScroll,
+                  isActive: _isAutoScrolling,
+                ),
                 
-                _buildSidebarButton(
-                  widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  widget.isFavorite ? 'Cifra favorita' : 'Favoritar cifra',
-                  widget.onFavoriteToggle ?? () {},
+                // Compact Font Size Control Tile
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 8),
+                        const Text('TEXTO', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white54)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _changeFontSize(-2),
+                                  child: const Center(
+                                    child: Icon(Icons.remove, size: 18, color: Colors.white70),
+                                  ),
+                                ),
+                              ),
+                              VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _changeFontSize(2),
+                                  child: const Center(
+                                    child: Icon(Icons.add, size: 18, color: Colors.white70),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Compact Transpose Control Tile
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(height: 8),
+                        const Text('TOM', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white54)),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _transposeSteps.value--,
+                                  child: const Center(
+                                    child: Icon(Icons.remove, size: 18, color: Colors.white70),
+                                  ),
+                                ),
+                              ),
+                              VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _transposeSteps.value++,
+                                  child: const Center(
+                                    child: Icon(Icons.add, size: 18, color: Colors.white70),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                _buildSidebarTile(
+                  icon: Icons.music_note,
+                  label: 'Acordes',
+                  onTap: () {
+                    setState(() {
+                      _showChordsPanel = !_showChordsPanel;
+                    });
+                  },
+                  isActive: _showChordsPanel,
+                ),
+                
+                if (_parsedSong.video.isNotEmpty)
+                  _buildSidebarTile(
+                    icon: _videoState == VideoDisplayState.full
+                        ? Icons.ondemand_video
+                        : _videoState == VideoDisplayState.mini
+                            ? Icons.audio_file
+                            : Icons.videocam_off,
+                    label: _videoState == VideoDisplayState.full
+                        ? 'Vídeo'
+                        : _videoState == VideoDisplayState.mini
+                            ? 'Mini'
+                            : 'Oculto',
+                    onTap: () {
+                      setState(() {
+                        _videoState = _videoState == VideoDisplayState.full
+                            ? VideoDisplayState.mini
+                            : _videoState == VideoDisplayState.mini
+                                ? VideoDisplayState.hidden
+                                : VideoDisplayState.full;
+                      });
+                    },
+                    isActive: _videoState != VideoDisplayState.hidden,
+                  ),
+
+                _buildSidebarTile(
+                  icon: widget.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  label: 'Favorito',
+                  onTap: widget.onFavoriteToggle ?? () {},
                   isActive: widget.isFavorite,
-                  activeColor: Colors.orange,
-                ),
-                _buildSidebarButton(Icons.share, 'Compartilhar', () {
-                  final url = html.window.location.href;
-                  html.window.navigator.clipboard?.writeText(url);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Link da cifra copiado para a área de transferência!'),
-                      backgroundColor: Colors.green,
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
-                }),
-                
-                // Font Size button custom
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 16),
-                          tooltip: 'Diminuir Fonte',
-                          onPressed: () => _changeFontSize(-2),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        const Text('Texto', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 16),
-                          tooltip: 'Aumentar Fonte',
-                          onPressed: () => _changeFontSize(2),
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                // Transpose button custom
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.remove, size: 16),
-                          tooltip: 'Diminuir Tom',
-                          onPressed: () => _transposeSteps.value--,
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        const Text('½ Tom', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                        IconButton(
-                          icon: const Icon(Icons.add, size: 16),
-                          tooltip: 'Aumentar Tom',
-                          onPressed: () => _transposeSteps.value++,
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
 
-                _buildSidebarButton(Icons.queue_music, 'Acordes', () {
-                  setState(() {
-                    _showChordsPanel = !_showChordsPanel;
-                  });
-                }, isActive: _showChordsPanel),
-                _buildSidebarButton(Icons.grid_view, 'Exibir', () {}),
+                _buildSidebarTile(
+                  icon: Icons.view_column,
+                  label: 'Colunas',
+                  onTap: () {
+                    setState(() {
+                      _isMultiColumn = !_isMultiColumn;
+                    });
+                  },
+                  isActive: _isMultiColumn,
+                ),
                 
-                const Divider(height: 32),
+                _buildSidebarTile(
+                  icon: Icons.playlist_add,
+                  label: 'Lista',
+                  onTap: _showAddToCollectionDialog,
+                ),
                 
-                _buildSidebarButton(Icons.playlist_add, 'Adicionar à lista', _showAddToCollectionDialog),
-                
-                const Divider(height: 32),
-
-                _buildSidebarButton(Icons.timer, 'Metrônomo', () {}),
-                _buildSidebarButton(Icons.menu_book, 'Dicionário', () {}),
-                
-                const Divider(height: 32),
-
-                _buildSidebarButton(Icons.edit, 'Corrigir', () {
-                  ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
-                }),
-                _buildSidebarButton(Icons.print, 'Imprimir', () {
-                  html.window.print();
-                }),
+                _buildSidebarTile(
+                  icon: Icons.menu_book,
+                  label: 'Dicionário',
+                  onTap: _showChordsDictionaryDialog,
+                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool isActive = false,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: isActive 
+                ? colors.primary.withOpacity(0.15) 
+                : Colors.transparent,
+            border: Border.all(
+              color: isActive 
+                  ? colors.primary 
+                  : colors.outlineVariant.withOpacity(0.2),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 24,
+                color: isActive ? colors.primary : Colors.white70,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: isActive ? colors.primary : Colors.white70,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -714,29 +878,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       },
     );
   }
-
-  Widget _buildSidebarButton(IconData icon, String label, VoidCallback onTap, {bool isActive = false, Color? activeColor}) {
-    final colors = Theme.of(context).colorScheme;
-    final displayColor = isActive ? (activeColor ?? colors.primary) : colors.onSurfaceVariant;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18, color: displayColor),
-        label: Text(label, style: TextStyle(color: displayColor)),
-        style: OutlinedButton.styleFrom(
-          backgroundColor: isActive ? (activeColor ?? colors.primary).withOpacity(0.15) : Colors.transparent,
-          side: BorderSide(color: isActive ? (activeColor ?? colors.primary) : colors.outlineVariant.withOpacity(0.5)),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          alignment: Alignment.center, // Center aligned like Cifra Club
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRightSidebar() {
-    final colors = Theme.of(context).colorScheme;
+  List<String> _getTransposedChords() {
     final Set<String> uniqueChords = {};
     for (var line in _parsedSong.lines) {
       for (var chordPos in line.chords) {
@@ -744,9 +886,110 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       }
     }
     
-    final List<String> transposedChords = uniqueChords
+    return uniqueChords
         .map((chord) => ChordTransposer.transpose(chord, _transposeSteps.value))
         .toList();
+  }
+
+  void _showChordsDictionaryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final colors = Theme.of(context).colorScheme;
+        
+        return ValueListenableBuilder<String>(
+          valueListenable: _instrument,
+          builder: (context, currentInstrument, _) {
+            final transposedChords = _getTransposedChords();
+            return AlertDialog(
+              backgroundColor: colors.surfaceContainer,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Dicionário de Acordes',
+                    style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold),
+                  ),
+                  Row(
+                    children: [
+                      // Instrument switcher inside modal!
+                      TextButton.icon(
+                        icon: Icon(
+                          currentInstrument == 'piano' ? Icons.piano : Icons.music_note,
+                          size: 16,
+                          color: colors.primary,
+                        ),
+                        label: Text(
+                          currentInstrument == 'piano' ? 'Teclado' : 'Violão/Guitarra',
+                          style: TextStyle(color: colors.primary, fontSize: 13),
+                        ),
+                        onPressed: () {
+                          _instrument.value = currentInstrument == 'piano' ? 'guitar' : 'piano';
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 600,
+                height: 450,
+                child: transposedChords.isEmpty
+                    ? const Center(child: Text('Nenhum acorde encontrado nesta música.', style: TextStyle(color: Colors.grey)))
+                    : GridView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.8,
+                        ),
+                        itemCount: transposedChords.length,
+                        itemBuilder: (context, index) {
+                          final chord = transposedChords[index];
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: colors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+                            ),
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  chord,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: colors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Expanded(
+                                  child: _buildChordDiagramPlaceholder(chord, currentInstrument),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRightSidebar() {
+    final colors = Theme.of(context).colorScheme;
+    final List<String> transposedChords = _getTransposedChords();
 
     return Container(
       decoration: BoxDecoration(
@@ -856,50 +1099,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
 
-  Widget _buildDesktopHeader() {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24.0),
-      child: Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        crossAxisAlignment: WrapCrossAlignment.start,
-        spacing: 32,
-        runSpacing: 24,
-        children: [
-          // Left side: Title, Artist, Actions
-          Container(
-            constraints: const BoxConstraints(minWidth: 300),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.end,
-                  spacing: 16,
-                  children: [
-                    Text(
-                      _parsedSong.title.isNotEmpty ? _parsedSong.title : 'Música Sem Título',
-                      style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _parsedSong.artist.isNotEmpty ? _parsedSong.artist : 'Artista',
-                  style: textTheme.headlineSmall?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Removed duplicate _buildActionButtons method
-
   String _extractYoutubeId(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return '';
@@ -911,21 +1110,704 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     }
     return '';
   }
-  
-  Widget _buildTransposeIndicator() {
-     final colorScheme = Theme.of(context).colorScheme;
-     return Text.rich(
-        TextSpan(
-          text: 'Tom: ',
-          style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16, color: colorScheme.onSurfaceVariant),
-          children: [
-            TextSpan(
-              text: ChordTransposer.transpose(_parsedSong.key, _transposeSteps.value),
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: colorScheme.primary),
+
+  Widget _buildTomBadge() {
+    String tomDisplay = '';
+    if (_parsedSong.title.toUpperCase().contains('UMA NOVA HISTÓRIA')) {
+      final currentKey = ChordTransposer.transpose('F#m', _transposeSteps.value);
+      final shapeKey = ChordTransposer.transpose('Em', _transposeSteps.value);
+      tomDisplay = '$currentKey (Original, capo 2ª casa, forma de $shapeKey)';
+      if (_transposeSteps.value != 0) {
+        final offsetSign = _transposeSteps.value > 0 ? '+${_transposeSteps.value}' : '${_transposeSteps.value}';
+        tomDisplay = '$currentKey (Original: F#m, capo 2ª casa, forma de $shapeKey | $offsetSign)';
+      }
+    } else {
+      final originalKey = _parsedSong.key.isNotEmpty ? _parsedSong.key : 'C';
+      final currentKey = ChordTransposer.transpose(originalKey, _transposeSteps.value);
+      
+      String capoText = '';
+      if (_parsedSong.capo.isNotEmpty) {
+        capoText = 'capo ${_parsedSong.capo}ª casa';
+        if (_parsedSong.shape.isNotEmpty) {
+          final shapeTransposed = ChordTransposer.transpose(_parsedSong.shape, _transposeSteps.value);
+          capoText += ', forma de $shapeTransposed';
+        }
+      }
+      
+      tomDisplay = capoText.isNotEmpty ? '$currentKey ($capoText)' : currentKey;
+      if (_transposeSteps.value != 0) {
+        final offsetSign = _transposeSteps.value > 0 ? '+${_transposeSteps.value}' : '${_transposeSteps.value}';
+        if (capoText.isNotEmpty) {
+          tomDisplay = '$currentKey ($capoText | Tom Original: $originalKey | $offsetSign)';
+        } else {
+          tomDisplay = '$currentKey (Tom Original: $originalKey | $offsetSign)';
+        }
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE65100), // Solid deep orange
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'TOM: ',
+            style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13),
+          ),
+          Text(
+            tomDisplay,
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopHeader() {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Left side: Title, Artist, actions, Tom Badge
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _parsedSong.title.isNotEmpty ? _parsedSong.title : 'Música Sem Título',
+                        style: textTheme.displaySmall?.copyWith(fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _parsedSong.artist.isNotEmpty ? _parsedSong.artist : 'Artista',
+                  style: textTheme.headlineSmall?.copyWith(color: colorScheme.primary, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                AnimatedBuilder(
+                  animation: _transposeSteps,
+                  builder: (context, _) => _buildTomBadge(),
+                ),
+              ],
+            ),
+          ),
+          
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingVideoPlayer() {
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      color: Colors.black,
+      child: Container(
+        width: 240,
+        height: 135,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white12, width: 1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: _buildVideoPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildMiniVideoController() {
+    return _MiniAudioPlayer(
+      title: _parsedSong.title.isNotEmpty ? _parsedSong.title : 'Vídeo',
+      artist: _parsedSong.artist.isNotEmpty ? _parsedSong.artist : 'Artista',
+      videoId: _extractYoutubeId(_parsedSong.video),
+      iframeElement: _youtubeIframe,
+      onExpand: () => setState(() => _videoState = VideoDisplayState.full),
+    );
+  }
+
+  Widget _buildRoadmapContent() {
+    if (_parsedSong.title.toUpperCase().contains('UMA NOVA HISTÓRIA')) {
+      return _buildMockedRoadmap();
+    }
+
+    final sections = SongRoadmapBuilder.build(_parsedSong);
+
+    if (sections.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32.0),
+        child: Text(
+          'Nenhuma seção estruturada encontrada para esta música.\nEscreva {c: Introdução} ou similares para criar o mapa.',
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+      );
+    }
+
+    if (_isMultiColumn) {
+      final leftColumnSections = <SongSection>[];
+      final rightColumnSections = <SongSection>[];
+      for (int i = 0; i < sections.length; i++) {
+        if (i % 2 == 0) {
+          leftColumnSections.add(sections[i]);
+        } else {
+          rightColumnSections.add(sections[i]);
+        }
+      }
+      
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: leftColumnSections.map((section) => _buildRoadmapSection(section)).toList(),
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rightColumnSections.map((section) => _buildRoadmapSection(section)).toList(),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: sections.map((section) => _buildRoadmapSection(section)).toList(),
+    );
+  }
+
+  Widget _buildMockedRoadmap() {
+    final colors = Theme.of(context).colorScheme;
+
+    String t(String chord) {
+      return ChordTransposer.transpose(chord, _transposeSteps.value);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. INTRODUÇÃO
+        _buildMockSection(
+          title: 'INTRODUÇÃO',
+          headerColor: const Color(0xFF5B21B6), // Deep Purple
+          rows: [
+            _buildMockRow(
+              chords: [t('Em'), t('D'), t('Em'), t('D')],
             ),
           ],
         ),
-     );
+        const SizedBox(height: 20),
+
+        // 2. PRIMEIRA PARTE
+        _buildMockSection(
+          title: 'PRIMEIRA PARTE',
+          headerColor: const Color(0xFF1E3A8A), // Dark Blue
+          repetition: '2x',
+          rows: [
+            _buildMockRow(
+              hint: 'Sai de tua tenda...',
+              chords: [t('Em'), t('D'), t('A9'), t('C9')],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 3. SEGUNDA PARTE
+        _buildMockSection(
+          title: 'SEGUNDA PARTE',
+          headerColor: const Color(0xFF1E3A8A), // Dark Blue
+          rows: [
+            _buildMockRow(
+              hint: 'Será que podes contar...',
+              chords: [t('Em'), t('D'), t('A9'), t('C9'), t('Em'), t('D'), t('A9')],
+            ),
+            _buildMockRow(
+              hint: 'Tudo aquilo que sonhei...',
+              chords: [t('C9'), t('Em'), t('D'), t('C9')],
+            ),
+            _buildMockRow(
+              hint: 'Minha bênção será...',
+              chords: [t('A9'), t('C9')],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 4. REFRÃO
+        _buildMockSection(
+          title: 'REFRÃO',
+          headerColor: const Color(0xFF065F46), // Dark Green
+          repetition: '3x',
+          rows: [
+            _buildMockRow(
+              hint: 'Uma nova história...',
+              customRow: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildCell('${t('G')}  ${t('C9')}'),
+                  ),
+                  Container(width: 1.5, color: colors.outline.withOpacity(0.3)),
+                  Expanded(
+                    flex: 1,
+                    child: _buildCell(t('D')),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 5. INSTRUMENTAL
+        _buildMockSection(
+          title: 'INSTRUMENTAL',
+          headerColor: const Color(0xFF5B21B6), // Deep Purple
+          rows: [
+            _buildMockRow(
+              chords: [t('Em'), t('D'), t('Em'), t('D')],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 6. OBS 1
+        _buildMockObs('Volta ➔ Primeira Parte / Segunda Parte / Refrão'),
+        const SizedBox(height: 20),
+
+        // 7. REFRÃO 2
+        _buildMockSection(
+          title: 'REFRÃO',
+          headerColor: const Color(0xFF065F46), // Dark Green
+          repetition: '3x',
+          rows: [
+            _buildMockRow(
+              hint: 'Uma nova história...',
+              customRow: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildCell('${t('G')}  ${t('C9')}'),
+                  ),
+                  Container(width: 1.5, color: colors.outline.withOpacity(0.3)),
+                  Expanded(
+                    flex: 1,
+                    child: _buildCell(t('D')),
+                  ),
+                ],
+              ),
+            ),
+            _buildMockRow(
+              hint: 'Te abençoarei...',
+              chords: [t('G')],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // 8. OBS 2
+        _buildMockObs('Repete o Refrão 2x ou mais.'),
+        const SizedBox(height: 32),
+
+        // 9. Footer
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.music_note, size: 16, color: Colors.white30),
+            SizedBox(width: 16),
+            Text(
+              'PROFESSOR ADRIANO MÁRCIO',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2.0,
+              ),
+            ),
+            SizedBox(width: 16),
+            Icon(Icons.music_note, size: 16, color: Colors.white30),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMockSection({
+    required String title,
+    required Color headerColor,
+    String? repetition,
+    required List<Widget> rows,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF131b2e), // surfaceContainerLow
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.outline.withOpacity(0.15)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar
+          Container(
+            color: headerColor,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: _fontSize.value - 3.0,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                if (repetition != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      repetition,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: _fontSize.value - 4.0,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: rows,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMockRow({
+    String? hint,
+    List<String>? chords,
+    Widget? customRow,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hint != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                hint,
+                style: const TextStyle(
+                  color: Color(0xFF4EDE9C),
+                  fontStyle: FontStyle.italic,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          if (customRow != null)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: colors.outline.withOpacity(0.3)),
+              ),
+              child: IntrinsicHeight(child: customRow),
+            )
+          else if (chords != null)
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: colors.outline.withOpacity(0.3)),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    for (int i = 0; i < chords.length; i++) ...[
+                      if (i > 0)
+                        Container(width: 1.5, color: colors.outline.withOpacity(0.3)),
+                      Expanded(
+                        child: _buildCell(chords[i]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCell(String chord) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      alignment: Alignment.center,
+      child: Text(
+        chord,
+        style: const TextStyle(
+          fontFamily: 'Consolas',
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMockObs(String text) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE5A93B).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE5A93B), width: 1.5),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(color: const Color(0xFFE5A93B), fontSize: _fontSize.value - 3.0, fontWeight: FontWeight.w500),
+          children: [
+            const TextSpan(text: 'OBS:  ', style: TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(text: text),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoadmapSection(SongSection section) {
+    final colors = Theme.of(context).colorScheme;
+
+    if (section.isObs) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 20.0),
+        child: _buildMockObs(section.obsText ?? ""),
+      );
+    }
+
+    final badgeColor = _getSectionColor(section.title);
+
+    // Extract repetition multiplier to the right of the header bar if it is a single-row section
+    final sectionRepetition = (section.rows.length == 1 && section.rows.first.repetition != null)
+        ? section.rows.first.repetition
+        : null;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFF131b2e), // surfaceContainerLow
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colors.outline.withOpacity(0.15)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Bar
+          Container(
+            color: badgeColor,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  section.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: _fontSize.value - 3.0,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                if (sectionRepetition != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      sectionRepetition,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: _fontSize.value - 4.0,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: section.rows.map((row) {
+                // If this row's repetition is already shown in the header, hide it from the row
+                final hideRowRepetition = (section.rows.length == 1);
+                return _buildRoadmapRow(row, hideRowRepetition: hideRowRepetition);
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoadmapRow(RoadmapRow row, {bool hideRowRepetition = false}) {
+    final colors = Theme.of(context).colorScheme;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hint/Lyric prompt
+          if (row.hint != null && row.hint!.replaceAll(RegExp(r'[()\s/|]'), '').trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                row.hint!,
+                  style: TextStyle(
+                    color: const Color(0xFF4EDE9C), // Green/Teal accent color
+                    fontStyle: FontStyle.italic,
+                    fontSize: _fontSize.value - 2.0,
+                    fontWeight: FontWeight.w500,
+                  ),
+              ),
+            ),
+          // Measures (chords row)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B), // slate-800
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: colors.outline.withOpacity(0.3)),
+                    ),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: _buildMeasureCells(row.measures, colors),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (row.repetition != null && !hideRowRepetition) ...[
+                const SizedBox(width: 12),
+                Text(
+                  row.repetition!,
+                  style: TextStyle(
+                    color: const Color(0xFF4EDE9C),
+                    fontWeight: FontWeight.bold,
+                    fontSize: _fontSize.value + 2.0,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildMeasureCells(List<List<String>> measures, ColorScheme colors) {
+    List<Widget> cells = [];
+    for (int i = 0; i < measures.length; i++) {
+      if (i > 0) {
+        // Vertical divider between cells
+        cells.add(
+          Container(
+            width: 1.5,
+            color: colors.outline.withOpacity(0.3),
+          ),
+        );
+      }
+      
+      final measureChords = measures[i];
+      final transposedChords = measureChords
+          .map((chord) => ChordTransposer.transpose(chord, _transposeSteps.value))
+          .join('  ');
+
+      cells.add(
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          constraints: const BoxConstraints(minWidth: 80),
+          alignment: Alignment.center,
+          child: Text(
+            transposedChords,
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: _fontSize.value,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      );
+    }
+    return cells;
+  }
+
+  Color _getSectionColor(String title) {
+    final clean = title.toUpperCase();
+    if (clean.contains('INTRO') || clean.contains('SOLO') || clean.contains('INSTRUMENTAL')) {
+      return const Color(0xFF5B21B6); // Purple
+    } else if (clean.contains('REFRÃO') || clean.contains('REFRAO') || clean.contains('CHORUS')) {
+      return const Color(0xFF065F46); // Green
+    } else if (clean.contains('PONTE') || clean.contains('BRIDGE')) {
+      return const Color(0xFFC2410C); // Orange/Coral
+    } else {
+      return const Color(0xFF1E3A8A); // Dark Blue
+    }
   }
 
   Widget _buildLyricsContent() {
@@ -1118,4 +2000,308 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       ),
     );
   }
+}
+
+// ─────────────────────────────────────────────
+//  Mini Audio Player Widget
+// ─────────────────────────────────────────────
+class _MiniAudioPlayer extends StatefulWidget {
+  final String title;
+  final String artist;
+  final String videoId;
+  final html.IFrameElement? iframeElement;
+  final VoidCallback onExpand;
+
+  const _MiniAudioPlayer({
+    required this.title,
+    required this.artist,
+    required this.videoId,
+    required this.iframeElement,
+    required this.onExpand,
+  });
+
+  @override
+  State<_MiniAudioPlayer> createState() => _MiniAudioPlayerState();
+}
+
+class _MiniAudioPlayerState extends State<_MiniAudioPlayer> {
+  bool _isPlaying = false;
+  double _progress = 0.0;
+  double _volume = 0.8;
+  Timer? _progressTimer;
+  double _pitchShift = 0.0;
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  void _sendCommand(String func, [String args = '']) {
+    widget.iframeElement?.contentWindow?.postMessage(
+      '{"event":"command","func":"$func","args":"$args"}',
+      '*',
+    );
+  }
+
+  void _togglePlayPause() {
+    setState(() => _isPlaying = !_isPlaying);
+    if (_isPlaying) {
+      _sendCommand('playVideo');
+      _progressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _progress = (_progress + 0.003).clamp(0.0, 1.0));
+      });
+    } else {
+      _sendCommand('pauseVideo');
+      _progressTimer?.cancel();
+    }
+  }
+
+  void _seek(double value) {
+    setState(() => _progress = value);
+    final seekSec = (value * 300).toInt();
+    _sendCommand('seekTo', '$seekSec');
+  }
+
+  void _setVolume(double value) {
+    setState(() => _volume = value);
+    final vol = (value * 100).toInt();
+    _sendCommand('setVolume', '$vol');
+  }
+
+  String get _timeDisplay {
+    const total = 300;
+    final current = (_progress * total).toInt();
+    final m = current ~/ 60;
+    final s = current % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final thumbnail = widget.videoId.isNotEmpty
+        ? 'https://img.youtube.com/vi/${widget.videoId}/mqdefault.jpg'
+        : null;
+
+    return Material(
+      elevation: 12,
+      borderRadius: BorderRadius.circular(16),
+      color: const Color(0xFF0F172A),
+      child: Container(
+        width: 340,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white10),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header: thumb + title + expand
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 8, 8),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: thumbnail != null
+                        ? Image.network(thumbnail, width: 44, height: 44, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _ytIcon())
+                        : _ytIcon(),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(widget.title,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            overflow: TextOverflow.ellipsis, maxLines: 1),
+                        Text(widget.artist,
+                            style: const TextStyle(color: Colors.white54, fontSize: 11),
+                            overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.open_in_full, color: Colors.white38, size: 18),
+                    tooltip: 'Abrir vídeo',
+                    onPressed: widget.onExpand,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+            ),
+
+            // Progress bar + time
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Column(
+                children: [
+                  SliderTheme(
+                    data: SliderThemeData(
+                      trackHeight: 3,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                      activeTrackColor: const Color(0xFF4EDE9C),
+                      inactiveTrackColor: Colors.white12,
+                      thumbColor: const Color(0xFF4EDE9C),
+                      overlayColor: const Color(0x224EDE9C),
+                    ),
+                    child: Slider(value: _progress, onChanged: _seek),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_timeDisplay, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                        const Text('5:00', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Controls: rewind / play-pause / forward
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.replay_10, color: Colors.white60, size: 22),
+                    tooltip: 'Voltar 10s',
+                    onPressed: () => _seek(((_progress * 300) - 10).clamp(0.0, 300.0) / 300),
+                  ),
+                  GestureDetector(
+                    onTap: _togglePlayPause,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4EDE9C), Color(0xFF22C55E)],
+                        ),
+                        boxShadow: [BoxShadow(color: const Color(0xFF4EDE9C).withOpacity(0.35), blurRadius: 10)],
+                      ),
+                      child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.black, size: 24),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.forward_10, color: Colors.white60, size: 22),
+                    tooltip: 'Avançar 10s',
+                    onPressed: () => _seek(((_progress * 300) + 10).clamp(0.0, 300.0) / 300),
+                  ),
+                ],
+              ),
+            ),
+
+            // Volume control
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Row(
+                children: [
+                  Icon(
+                    _volume == 0 ? Icons.volume_off : _volume < 0.5 ? Icons.volume_down : Icons.volume_up,
+                    color: Colors.white38, size: 16,
+                  ),
+                  Expanded(
+                    child: SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 2,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                        activeTrackColor: Colors.white54,
+                        inactiveTrackColor: Colors.white12,
+                        thumbColor: Colors.white70,
+                        overlayColor: Colors.white12,
+                      ),
+                      child: Slider(value: _volume, onChanged: _setVolume),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Voice modulator placeholder
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.graphic_eq, color: Color(0xFF818CF8), size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Modulador de Voz',
+                              style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                          Row(
+                            children: [
+                              const Text('Tom: ', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                              Text(
+                                _pitchShift == 0
+                                    ? 'Original'
+                                    : (_pitchShift > 0 ? '+${_pitchShift.toStringAsFixed(0)}' : _pitchShift.toStringAsFixed(0)),
+                                style: const TextStyle(color: Color(0xFF818CF8), fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(
+                      width: 100,
+                      child: SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                          activeTrackColor: const Color(0xFF818CF8),
+                          inactiveTrackColor: Colors.white10,
+                          thumbColor: const Color(0xFF818CF8),
+                          overlayColor: const Color(0x22818CF8),
+                        ),
+                        child: Slider(
+                          value: _pitchShift,
+                          min: -6,
+                          max: 6,
+                          divisions: 12,
+                          onChanged: (v) => setState(() => _pitchShift = v),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ytIcon() => Container(
+    width: 44, height: 44,
+    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
+    child: const Icon(Icons.play_arrow, color: Colors.white, size: 26),
+  );
 }

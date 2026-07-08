@@ -676,26 +676,52 @@ E os acordes [G]entre colchetes
               ],
             ),
           ),
-          const Divider(),
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
             child: Column(
               children: [
+                const Divider(height: 1, color: Colors.white10),
+                const SizedBox(height: 4),
                 _buildSidebarActionItem(Icons.settings, 'Configurações', colors, () {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configurações em breve!'), duration: Duration(seconds: 1)));
                 }),
-                const SizedBox(height: 8),
-                IconButton(
-                  icon: Icon(
-                    _collapseMainSidebar ? Icons.chevron_right : Icons.chevron_left,
-                    color: colors.onSurfaceVariant,
-                    size: 24,
-                  ),
-                  onPressed: () {
+                InkWell(
+                  onTap: () {
                     setState(() {
                       _collapseMainSidebar = !_collapseMainSidebar;
                     });
                   },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 46,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: _collapseMainSidebar ? 0 : 14,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: _collapseMainSidebar
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _collapseMainSidebar ? Icons.chevron_right : Icons.chevron_left,
+                          color: colors.onSurfaceVariant,
+                          size: 20,
+                        ),
+                        if (!_collapseMainSidebar) ...[
+                          const SizedBox(width: 12),
+                          Text(
+                            'Minimizar',
+                            style: TextStyle(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -710,42 +736,60 @@ E os acordes [G]entre colchetes
 
   Widget _buildSidebarItem(IconData icon, String title, SidebarTab tab, ColorScheme colors, SidebarTab activeTab) {
     final isActive = activeTab == tab;
-    return InkWell(
-      onTap: () {
-        ref.read(sidebarTabProvider.notifier).setTab(tab);
-        if (tab == SidebarTab.songs) {
-          ref.read(songFilterProvider.notifier).clear();
-        } else if (tab == SidebarTab.favorites) {
-          ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
-        }
-      },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 0 : 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isActive ? colors.secondary.withOpacity(0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: isActive && !_collapseMainSidebar ? Border(left: BorderSide(color: colors.primary, width: 3)) : null,
-        ),
-        child: Row(
-          mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
-          children: [
-            Icon(icon, color: isActive ? colors.primary : colors.onSurfaceVariant),
-            if (!_collapseMainSidebar) ...[
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: isActive ? colors.primary : colors.onSurfaceVariant,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: InkWell(
+        onTap: () {
+          ref.read(sidebarTabProvider.notifier).setTab(tab);
+          if (tab == SidebarTab.songs) {
+            ref.read(songFilterProvider.notifier).clear();
+          } else if (tab == SidebarTab.favorites) {
+            ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
+          }
+        },
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 46,
+          padding: EdgeInsets.symmetric(
+            horizontal: _collapseMainSidebar ? 0 : 14,
+          ),
+          decoration: BoxDecoration(
+            color: isActive
+                ? colors.primary.withOpacity(0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isActive && !_collapseMainSidebar
+                ? Border.all(color: colors.primary.withOpacity(0.35), width: 1)
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: _collapseMainSidebar
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isActive ? colors.primary : colors.onSurfaceVariant,
               ),
+              if (!_collapseMainSidebar) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: isActive ? colors.primary : colors.onSurfaceVariant,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -754,18 +798,29 @@ E os acordes [G]entre colchetes
   Widget _buildSidebarActionItem(IconData icon, String title, ColorScheme colors, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 0 : 16, vertical: 12),
+        height: 46,
+        padding: EdgeInsets.symmetric(
+          horizontal: _collapseMainSidebar ? 0 : 14,
+        ),
         child: Row(
           mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(icon, color: colors.onSurfaceVariant),
+            Icon(icon, size: 20, color: colors.onSurfaceVariant),
             if (!_collapseMainSidebar) ...[
               const SizedBox(width: 12),
               Expanded(
-                child: Text(title, style: TextStyle(color: colors.onSurfaceVariant, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ],
