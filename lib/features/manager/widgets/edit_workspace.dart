@@ -14,6 +14,15 @@ import '../../songs/utils/chord_transposer.dart';
 
 enum ChordFormat { chordPro, text }
 
+const List<String> _majorKeys = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const List<String> _minorKeys = ['Am', 'A#m', 'Bm', 'Cm', 'C#m', 'Dm', 'D#m', 'Em', 'Fm', 'F#m', 'Gm', 'G#m'];
+
+String _extractRootFromKey(String key) {
+  if (key == 'Detectar') return key;
+  final match = RegExp(r'^([CDEFGAB][#b]?)').firstMatch(key);
+  return match?.group(1) ?? key;
+}
+
 class EditWorkspace extends ConsumerStatefulWidget {
   const EditWorkspace({super.key});
 
@@ -70,8 +79,12 @@ class _EditWorkspaceState extends ConsumerState<EditWorkspace> {
     _videoUrlController.text = videoMatch?.group(1) ?? '';
     
     String keyVal = keyMatch?.group(1) ?? 'Detectar';
-    if (!['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'].contains(keyVal)) {
+    final allKeys = ['Detectar', ..._majorKeys, ..._minorKeys];
+    if (!allKeys.contains(keyVal)) {
       keyVal = 'Detectar';
+    }
+    if (keyVal != 'Detectar' && _minorKeys.contains(keyVal)) {
+      keyVal = _majorKeys[_minorKeys.indexOf(keyVal)];
     }
     _selectedKey = keyVal;
     
@@ -181,11 +194,14 @@ class _EditWorkspaceState extends ConsumerState<EditWorkspace> {
     final notes = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
     final notesAlt = ['C', 'Db', 'D', 'D#', 'E', 'F', 'Gb', 'G', 'G#', 'A', 'A#', 'B'];
     
-    int indexFrom = notes.indexOf(fromKey);
-    if (indexFrom == -1) indexFrom = notesAlt.indexOf(fromKey);
+    final rootFrom = _extractRootFromKey(fromKey);
+    final rootTo = _extractRootFromKey(toKey);
     
-    int indexTo = notes.indexOf(toKey);
-    if (indexTo == -1) indexTo = notesAlt.indexOf(toKey);
+    int indexFrom = notes.indexOf(rootFrom);
+    if (indexFrom == -1) indexFrom = notesAlt.indexOf(rootFrom);
+    
+    int indexTo = notes.indexOf(rootTo);
+    if (indexTo == -1) indexTo = notesAlt.indexOf(rootTo);
     
     if (indexFrom == -1 || indexTo == -1) return;
     
@@ -864,8 +880,37 @@ E os acordes [G]entre colchetes
                         isExpanded: true,
                         dropdownColor: colors.surfaceContainerHigh,
                         style: const TextStyle(color: Colors.white, fontSize: 13),
-                        items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
-                            .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+                        selectedItemBuilder: (context) {
+                          return ['Detectar', ..._majorKeys].map((k) {
+                            if (k == 'Detectar') {
+                              return const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text('Detectar', style: TextStyle(color: Colors.white54, fontSize: 13)),
+                              );
+                            }
+                            final idx = _majorKeys.indexOf(k);
+                            return Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                '$k / ${_minorKeys[idx]}',
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                              ),
+                            );
+                          }).toList();
+                        },
+                        items: ['Detectar', ..._majorKeys].map((k) {
+                          if (k == 'Detectar') {
+                            return const DropdownMenuItem(
+                              value: 'Detectar',
+                              child: Text('Detectar', style: TextStyle(color: Colors.white54)),
+                            );
+                          }
+                          final idx = _majorKeys.indexOf(k);
+                          return DropdownMenuItem(
+                            value: k,
+                            child: Text('$k / ${_minorKeys[idx]}'),
+                          );
+                        }).toList(),
                         onChanged: (v) {
                           if (v != null) {
                             _transposeEditorContent(fromKey: _selectedKey, toKey: v);
@@ -1269,8 +1314,37 @@ E os acordes [G]entre colchetes
                                     isExpanded: true,
                                     dropdownColor: colors.surfaceContainerHigh,
                                     style: const TextStyle(color: Colors.white, fontSize: 14),
-                                    items: ['Detectar', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
-                                        .map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
+                                    selectedItemBuilder: (context) {
+                                      return ['Detectar', ..._majorKeys].map((k) {
+                                        if (k == 'Detectar') {
+                                          return const Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: Text('Detectar', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                                          );
+                                        }
+                                        final idx = _majorKeys.indexOf(k);
+                                        return Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            '$k / ${_minorKeys[idx]}',
+                                            style: const TextStyle(color: Colors.white, fontSize: 14),
+                                          ),
+                                        );
+                                      }).toList();
+                                    },
+                                    items: ['Detectar', ..._majorKeys].map((k) {
+                                      if (k == 'Detectar') {
+                                        return const DropdownMenuItem(
+                                          value: 'Detectar',
+                                          child: Text('Detectar', style: TextStyle(color: Colors.white54)),
+                                        );
+                                      }
+                                      final idx = _majorKeys.indexOf(k);
+                                      return DropdownMenuItem(
+                                        value: k,
+                                        child: Text('$k / ${_minorKeys[idx]}'),
+                                      );
+                                    }).toList(),
                                     onChanged: (v) {
                                       if (v != null) {
                                         _transposeEditorContent(fromKey: _selectedKey, toKey: v);
