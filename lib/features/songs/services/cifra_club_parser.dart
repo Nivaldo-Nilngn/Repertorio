@@ -4,8 +4,11 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 
 class CifraClubParser {
+  // Troque pela URL do seu worker após o deploy (ex: https://cifra-proxy.SEU_SUBDOMINIO.workers.dev)
+  static const String _proxyBaseUrl = 'https://cifra-proxy.nivaldo-nilngn.workers.dev';
+
   static Future<String> fetchAndParse(String url) async {
-    final proxyUrl = 'https://corsproxy.io/?' + Uri.encodeComponent(url);
+    final proxyUrl = '$_proxyBaseUrl?url=' + Uri.encodeComponent(url);
     try {
       final response = await http.get(Uri.parse(proxyUrl));
       if (response.statusCode == 200) {
