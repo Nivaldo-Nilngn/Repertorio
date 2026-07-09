@@ -9,6 +9,7 @@ import '../providers/editor_provider.dart';
 import '../providers/manager_providers.dart';
 import '../../songs/services/cifra_club_parser.dart';
 import '../../songs/repositories/song_repository.dart';
+import '../../midi/widgets/midi_settings_dialog.dart';
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -682,8 +683,11 @@ E os acordes [G]entre colchetes
               children: [
                 const Divider(height: 1, color: Colors.white10),
                 const SizedBox(height: 4),
-                _buildSidebarActionItem(Icons.settings, 'Configurações', colors, () {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Configurações em breve!'), duration: Duration(seconds: 1)));
+                _buildSidebarActionItem(Icons.settings, 'Configurações MIDI', colors, () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const MidiSettingsDialog(),
+                  );
                 }),
                 InkWell(
                   onTap: () {

@@ -9,6 +9,7 @@ import '../utils/chord_pro_parser.dart';
 import '../utils/chord_transposer.dart';
 import '../../manager/providers/editor_provider.dart';
 import '../repositories/song_repository.dart';
+import '../../midi/providers/midi_providers.dart';
 
 enum VideoDisplayState { full, mini, hidden }
 
@@ -260,8 +261,55 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     }
   }
 
+
+  void _scrollBy(double offset) {
+    if (_scrollController.hasClients) {
+      final currentScroll = _scrollController.offset;
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final target = (currentScroll + offset).clamp(0.0, maxScroll);
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _handleMidiAction(String action) {
+    switch (action) {
+      case 'toggle_scroll':
+        _toggleAutoScroll();
+        break;
+      case 'speed_up':
+        _changeScrollSpeed(0.5);
+        break;
+      case 'speed_down':
+        _changeScrollSpeed(-0.5);
+        break;
+      case 'scroll_up':
+        _scrollBy(-200);
+        break;
+      case 'scroll_down':
+        _scrollBy(200);
+        break;
+      case 'tone_up':
+        _transposeSteps.value++;
+        break;
+      case 'tone_down':
+        _transposeSteps.value--;
+        break;
+      // next_song and prev_song can be implemented later by notifying the manager
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<String?>(midiActionStreamProvider, (previous, next) {
+      if (next != null) {
+        _handleMidiAction(next);
+      }
+    });
+
     final colors = Theme.of(context).colorScheme;
 
     // On mobile (hideAppBar=false), show a proper full-screen page with AppBar

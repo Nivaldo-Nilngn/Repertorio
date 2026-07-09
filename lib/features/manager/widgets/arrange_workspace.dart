@@ -374,17 +374,29 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     );
   }
 
-  Widget _buildDashboardView(List<SongSetlist> setlists, ColorScheme colors) {
+  Widget _buildDashboardView(List<SongSetlist> setlists, AsyncValue<List<Song>> songAsync, ColorScheme colors) {
     // Sort chronologically reverse (newest created at the top)
     final sortedSetlists = setlists.reversed.toList();
 
-    return Padding(
+    return Row(
+      children: [
+        Container(
+          width: 400,
+          color: const Color(0xFF060e20),
+          child: _buildBibliotecaView(songAsync, colors),
+        ),
+        Container(width: 1, color: colors.outline.withOpacity(0.4)),
+        Expanded(
+          child: Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 16,
+            runSpacing: 16,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,11 +447,11 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                     ),
                   )
                 : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 320,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
-                      childAspectRatio: 1.6,
+                      mainAxisExtent: 180,
                     ),
                     itemCount: sortedSetlists.length,
                     itemBuilder: (context, index) {
@@ -486,14 +498,21 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                                 children: [
                                   Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
                                   const SizedBox(width: 4),
-                                  Text(
-                                    setlist.date,
-                                    style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+                                  Expanded(
+                                    child: Text(
+                                      setlist.date,
+                                      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
                               const Spacer(),
-                              Row(
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -506,13 +525,10 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                                       style: TextStyle(color: colors.primary, fontSize: 11, fontWeight: FontWeight.bold),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Est. $totalMinutes min',
-                                    style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
-                                  ),
+                                  Text('Est. $totalMinutes min', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
                                 ],
                               ),
+
                               const SizedBox(height: 12),
                               Row(
                                 children: [
@@ -561,6 +577,9 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
           ),
         ],
       ),
+    ),
+    ),
+      ],
     );
   }
 
@@ -579,7 +598,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
             if (_activeSetlist == null) {
               return isMobile
                   ? _buildMobileDashboard(setlists, colors)
-                  : _buildDashboardView(setlists, colors);
+                  : _buildDashboardView(setlists, songAsync, colors);
             }
 
             // Sync with active setlist
@@ -593,7 +612,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
               });
               return isMobile
                   ? _buildMobileDashboard(setlists, colors)
-                  : _buildDashboardView(setlists, colors);
+                  : _buildDashboardView(setlists, songAsync, colors);
             }
 
             if (_activeSetlist != matchedSetlist && !_isDirty) {
@@ -1023,10 +1042,82 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                           child: Text(song.key, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10, fontFamily: 'Consolas')),
                         ),
                         const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle, size: 20),
-                          color: colors.primary,
-                          onPressed: () => _addSongToSetlist(song),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_activeSetlist != null)
+                              IconButton(
+                                icon: const Icon(Icons.add_circle, size: 20),
+                                color: colors.primary,
+                                tooltip: 'Adicionar ao Repertório',
+                                onPressed: () => _addSongToSetlist(song),
+                              ),
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                              color: colors.surfaceContainer,
+                              onSelected: (value) async {
+                                if (value == 'edit') {
+                                  ref.read(editingChordProProvider.notifier).state = song.content;
+                                  ref.read(isEditorVisibleProvider.notifier).state = true;
+                                  ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                                  ref.read(songFilterProvider.notifier).clear();
+                                } else if (value == 'delete') {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      backgroundColor: colors.surface,
+                                      title: const Text('Excluir Música'),
+                                      content: Text('Tem certeza que deseja excluir "${song.title}"?\n\nEsta ação removerá a música do banco de dados e não pode ser desfeita.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: const Text('CANCELAR'),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                          child: const Text('EXCLUIR'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ref.read(songRepositoryProvider).deleteSong(song.id);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Música "${song.title}" excluída!'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 18),
+                                      SizedBox(width: 8),
+                                      Text('Editar'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, size: 18, color: Colors.red),
+                                      SizedBox(width: 8),
+                                      Text('Excluir', style: TextStyle(color: Colors.red)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ],
                     ),
