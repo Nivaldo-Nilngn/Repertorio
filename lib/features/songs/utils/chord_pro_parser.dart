@@ -67,7 +67,7 @@ class ChordProParser {
         final words = line.trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty);
         
         final chordRegex = RegExp(
-          r'^[A-G][b#]?(?:m|maj|min|sus|dim|aug|add|no)?(?:\d+)?(?:\([^)]+\))?(?:/[A-G][b#]?(?:m|maj|min|sus|dim|aug|add|no)?(?:\d+)?)?$',
+          r'^[A-G][b#]?(?:m|M|maj|min|sus|dim|aug|add|no|\d+)*[\(\)\d\+\-]*(?:/[A-G][b#]?(?:m|M|maj|min|sus|dim|aug|add|no|\d+)*[\(\)\d\+\-]*)?$',
           caseSensitive: false,
         );
         
@@ -164,7 +164,7 @@ class ChordProParser {
       }
       lyrics += line.substring(lastMatchEnd);
 
-      final lyricsWithoutBrackets = lyrics.replaceAll(RegExp(r'\[.*?\]'), '').trim();
+      final lyricsWithoutBrackets = lyrics.replaceAll(RegExp(r'\[.*?\]'), '').replaceAll('|', '').trim();
       final isInlineLine = chords.isNotEmpty && lyricsWithoutBrackets.isEmpty;
       lines.add(SongLine(lyrics: lyrics, chords: chords, isInline: isInlineLine));
     }

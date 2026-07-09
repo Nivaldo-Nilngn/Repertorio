@@ -1,17 +1,19 @@
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/song.dart';
 import '../models/song_collection.dart';
 import '../models/song_setlist.dart';
 
 class SongRepository {
   final FirebaseDatabase _database;
+  final String userId;
 
-  SongRepository({required FirebaseDatabase database}) : _database = database;
+  SongRepository({required FirebaseDatabase database, required this.userId}) : _database = database;
 
-  DatabaseReference get _songsRef => _database.ref('songs');
-  DatabaseReference get _collectionsRef => _database.ref('collections');
-  DatabaseReference get _setlistsRef => _database.ref('setlists');
+  DatabaseReference get _songsRef => _database.ref('users/$userId/songs');
+  DatabaseReference get _collectionsRef => _database.ref('users/$userId/collections');
+  DatabaseReference get _setlistsRef => _database.ref('users/$userId/setlists');
 
   Future<void> createCollection(SongCollection collection) async {
     await _collectionsRef.child(collection.id).set(collection.toJson());
@@ -156,7 +158,7 @@ class SongRepository {
           }).toList();
         }
       } catch (e) {
-        print('Error parsing songs from Firebase: \$e');
+        print('Error parsing songs from Firebase: $e');
       }
       return <Song>[];
     });
@@ -164,7 +166,11 @@ class SongRepository {
 }
 
 final songRepositoryProvider = Provider<SongRepository>((ref) {
-  return SongRepository(database: FirebaseDatabase.instance);
+  final user = ref.watch(authStateProvider).value;
+  return SongRepository(
+    database: FirebaseDatabase.instance,
+    userId: user?.uid ?? 'guest',
+  );
 });
 
 final songListProvider = StreamProvider<List<Song>>((ref) {
