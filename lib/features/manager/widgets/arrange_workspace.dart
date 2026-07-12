@@ -110,7 +110,9 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
 
   void _showCreateSetlistDialog() {
     final nameController = TextEditingController();
-    final dateController = TextEditingController(text: "${DateTime.now().day} Out, ${DateTime.now().year}");
+    final now = DateTime.now();
+    final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    final dateController = TextEditingController(text: "${now.day} ${months[now.month - 1]}, ${now.year}");
     bool initializeWithTemplate = true;
 
     showDialog(
@@ -131,7 +133,23 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: dateController,
-                    decoration: const InputDecoration(labelText: 'Data / Evento'),
+                    readOnly: true,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        dateController.text = "${picked.day} ${months[picked.month - 1]}, ${picked.year}";
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Data / Evento',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   CheckboxListTile(
@@ -382,7 +400,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
       children: [
         Container(
           width: 400,
-          color: const Color(0xFF060e20),
+          color: Theme.of(context).colorScheme.surfaceContainer,
           child: _buildBibliotecaView(songAsync, colors),
         ),
         Container(width: 1, color: colors.outline.withOpacity(0.4)),
@@ -474,7 +492,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
 
                       return Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131b2e),
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: colors.outline.withOpacity(0.2)),
                         ),
@@ -632,7 +650,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                 // Left Column: Biblioteca list of songs
                 Container(
                   width: 400,
-                  color: const Color(0xFF060e20),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
                   child: _buildBibliotecaView(songAsync, colors),
                 ),
                 Container(width: 1, color: colors.outline.withOpacity(0.4)),
@@ -659,13 +677,13 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
   Widget _buildMobileDashboard(List<SongSetlist> setlists, ColorScheme colors) {
     final sortedSetlists = setlists.reversed.toList();
     return Container(
-      color: const Color(0xFF0A0F1E),
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-            color: const Color(0xFF171f33),
+            color: Theme.of(context).colorScheme.surfaceContainer,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -724,7 +742,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF131b2e),
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: colors.outline.withOpacity(0.2)),
                         ),
@@ -822,7 +840,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
         children: [
           // Header
           Container(
-            color: const Color(0xFF171f33),
+            color: Theme.of(context).colorScheme.surfaceContainer,
             child: Column(
               children: [
                 Padding(
@@ -882,7 +900,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                 ),
                 // Tab 2: Biblioteca
                 Container(
-                  color: const Color(0xFF060e20),
+                  color: Theme.of(context).colorScheme.surfaceContainer,
                   child: _buildBibliotecaView(songAsync, colors),
                 ),
               ],
@@ -967,7 +985,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2d3449),
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: songAsync.when(
@@ -1003,7 +1021,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                 final query = _searchQuery.trim();
                 if (query.isEmpty) return true;
                 return s.title.toLowerCase().contains(query) || s.artist.toLowerCase().contains(query);
-              }).toList();
+              }).toList()..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
 
               if (filteredSongs.isEmpty) {
                 return const Center(child: Text('Nenhuma música encontrada.'));
@@ -1017,7 +1035,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF131b2e),
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: colors.outline.withOpacity(0.2)),
                     ),
@@ -1036,7 +1054,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2d3449),
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(song.key, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 10, fontFamily: 'Consolas')),
@@ -1330,7 +1348,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF060e20),
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: colors.outline.withOpacity(0.5)),
               ),
@@ -1378,7 +1396,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     return Container(
       margin: const EdgeInsets.only(left: 32, bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF131b2e),
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: colors.outline.withOpacity(0.3)),
       ),

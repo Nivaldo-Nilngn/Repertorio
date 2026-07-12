@@ -50,6 +50,9 @@ dependencies:
   guitar_chord_library: ^0.0.4
   url_launcher: ^6.3.2
   youtube_player_iframe: ^6.0.2
+  shared_preferences: ^2.5.5
+  wakelock_plus: ^1.6.1
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:

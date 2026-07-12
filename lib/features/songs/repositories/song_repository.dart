@@ -113,6 +113,10 @@ class SongRepository {
     await _songsRef.child(songId).remove();
   }
 
+  Future<void> deleteAllData() async {
+    await _database.ref('users/$userId').remove();
+  }
+
   Future<Song?> getSong(String songId) async {
     final snapshot = await _songsRef.child(songId).get();
     if (snapshot.exists && snapshot.value != null) {

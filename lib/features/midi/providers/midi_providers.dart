@@ -19,6 +19,10 @@ class MidiState {
   final bool isSupported;
   final List<MidiInputDevice> inputs;
   final String? activeInputId;
+  final List<MidiOutputDevice> outputs;
+  final String? activeOutputId;
+  final int activeChannel; // 0 = Omni, 1-16
+  final bool isReceivingSignal;
   final List<MidiProfile> profiles;
   final String activeProfileId;
   final bool isLearning;
@@ -28,6 +32,10 @@ class MidiState {
     this.isSupported = false,
     this.inputs = const [],
     this.activeInputId,
+    this.outputs = const [],
+    this.activeOutputId,
+    this.activeChannel = 0,
+    this.isReceivingSignal = false,
     this.profiles = const [],
     this.activeProfileId = 'default',
     this.isLearning = false,
@@ -41,6 +49,10 @@ class MidiState {
     bool? isSupported,
     List<MidiInputDevice>? inputs,
     String? activeInputId,
+    List<MidiOutputDevice>? outputs,
+    String? activeOutputId,
+    int? activeChannel,
+    bool? isReceivingSignal,
     List<MidiProfile>? profiles,
     String? activeProfileId,
     bool? isLearning,
@@ -50,6 +62,10 @@ class MidiState {
       isSupported: isSupported ?? this.isSupported,
       inputs: inputs ?? this.inputs,
       activeInputId: activeInputId ?? this.activeInputId,
+      outputs: outputs ?? this.outputs,
+      activeOutputId: activeOutputId ?? this.activeOutputId,
+      activeChannel: activeChannel ?? this.activeChannel,
+      isReceivingSignal: isReceivingSignal ?? this.isReceivingSignal,
       profiles: profiles ?? this.profiles,
       activeProfileId: activeProfileId ?? this.activeProfileId,
       isLearning: isLearning ?? this.isLearning,
@@ -90,8 +106,10 @@ class MidiNotifier extends Notifier<MidiState> {
     
     if (isSupported) {
       _refreshInputs();
+      _refreshOutputs();
       _stateChangeSub = _midiService.onStateChange.listen((_) {
         _refreshInputs();
+        _refreshOutputs();
       });
       _midiSub = _midiService.onMessage.listen(_onMidiMessage);
     }
@@ -109,8 +127,28 @@ class MidiNotifier extends Notifier<MidiState> {
     state = state.copyWith(inputs: inputs, activeInputId: state.activeInputId ?? activeId);
   }
 
+  void _refreshOutputs() {
+    final outputs = _midiService.getOutputs();
+    final activeId = outputs.isNotEmpty ? outputs.first.id : null;
+    state = state.copyWith(outputs: outputs, activeOutputId: state.activeOutputId ?? activeId);
+  }
+
   void setActiveInput(String inputId) {
     state = state.copyWith(activeInputId: inputId);
+  }
+
+  void setActiveOutput(String outputId) {
+    state = state.copyWith(activeOutputId: outputId);
+  }
+
+  void setActiveChannel(int channel) {
+    state = state.copyWith(activeChannel: channel);
+  }
+
+  void triggerPanic() {
+    if (state.activeOutputId != null) {
+      _midiService.sendPanic(state.activeOutputId!, channel: state.activeChannel);
+    }
   }
 
   void setActiveProfile(String profileId) {
@@ -139,6 +177,16 @@ class MidiNotifier extends Notifier<MidiState> {
     // Only process from active input device if one is selected
     if (state.activeInputId != null && event.portId != state.activeInputId) {
       return;
+    }
+
+    // Flash the LED
+    if (!state.isReceivingSignal) {
+      state = state.copyWith(isReceivingSignal: true);
+      Future.delayed(const Duration(milliseconds: 150), () {
+        try {
+          state = state.copyWith(isReceivingSignal: false);
+        } catch (_) {}
+      });
     }
 
     // Ignore Note Off

@@ -61,6 +61,31 @@ function getMidiInputs() {
   return inputs;
 }
 
+function getMidiOutputs() {
+  if (!midiAccess) return [];
+  const outputs = [];
+  for (let output of midiAccess.outputs.values()) {
+    outputs.push({
+      id: output.id,
+      name: output.name,
+      manufacturer: output.manufacturer,
+      state: output.state,
+      connection: output.connection
+    });
+  }
+  return outputs;
+}
+
+function sendMidiMessage(portId, data) {
+  if (!midiAccess) return false;
+  const output = midiAccess.outputs.get(portId);
+  if (output) {
+    output.send(data);
+    return true;
+  }
+  return false;
+}
+
 function setDartCallbacks(messageCallback, stateChangeCallback) {
   dartMidiMessageCallback = messageCallback;
   dartMidiStateChangeCallback = stateChangeCallback;
@@ -70,5 +95,7 @@ function setDartCallbacks(messageCallback, stateChangeCallback) {
 window.kordMidiInterop = {
   initWebMidi,
   getMidiInputs,
+  getMidiOutputs,
+  sendMidiMessage,
   setDartCallbacks
 };

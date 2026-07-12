@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/theme/settings_provider.dart';
 
-enum SidebarTab { songs, prepare, artists, favorites }
+enum SidebarTab { songs, prepare, artists, favorites, settings }
 
 class SongFilter {
   final String? folderId;
@@ -64,4 +66,36 @@ class SidebarTabNotifier extends Notifier<SidebarTab> {
 
 final sidebarTabProvider = NotifierProvider<SidebarTabNotifier, SidebarTab>(() {
   return SidebarTabNotifier();
+});
+
+class SelectedArtistNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void select(String? artist) {
+    state = artist;
+  }
+}
+
+final selectedArtistForViewProvider = NotifierProvider<SelectedArtistNotifier, String?>(() {
+  return SelectedArtistNotifier();
+});
+
+class IsTopMenuNotifier extends Notifier<bool> {
+  late SharedPreferences _prefs;
+
+  @override
+  bool build() {
+    _prefs = ref.watch(sharedPreferencesProvider);
+    return _prefs.getBool('isTopMenu') ?? false;
+  }
+
+  void toggle() {
+    state = !state;
+    _prefs.setBool('isTopMenu', state);
+  }
+}
+
+final isTopMenuProvider = NotifierProvider<IsTopMenuNotifier, bool>(() {
+  return IsTopMenuNotifier();
 });

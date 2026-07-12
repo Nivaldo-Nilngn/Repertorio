@@ -12,77 +12,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  
-  bool _isLogin = true;
   bool _isLoading = false;
-  bool _obscurePassword = true;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-    
-    try {
-      if (_isLogin) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String message = 'Ocorreu um erro. Tente novamente.';
-      if (e.code == 'user-not-found') {
-        message = 'Nenhum usuário encontrado para este e-mail.';
-      } else if (e.code == 'wrong-password') {
-        message = 'Senha incorreta. Tente novamente.';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'Este e-mail já está em uso.';
-      } else if (e.code == 'invalid-email') {
-        message = 'Endereço de e-mail inválido.';
-      } else if (e.code == 'weak-password') {
-        message = 'A senha fornecida é muito fraca.';
-      }
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: $e'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
 
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
@@ -147,255 +77,124 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(32),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
-                    width: 440,
-                    padding: const EdgeInsets.all(40),
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    padding: const EdgeInsets.all(48),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.04),
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(32),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withOpacity(0.1),
                         width: 1.5,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // App Branding
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              size: 40,
-                              color: colors.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'KordApp',
-                            style: GoogleFonts.outfit(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isLogin
-                                ? 'Seu songbook digital definitivo.'
-                                : 'Crie sua conta para começar.',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 36),
-
-                          // Email Input
-                          TextFormField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: _buildInputDecoration(
-                              hintText: 'Endereço de e-mail',
-                              icon: Icons.email_outlined,
-                              colors: colors,
-                            ),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Insira seu e-mail';
-                              }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(val)) {
-                                return 'Insira um e-mail válido';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Password Input
-                          TextFormField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: _buildInputDecoration(
-                              hintText: 'Senha',
-                              icon: Icons.lock_outlined,
-                              colors: colors,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  color: Colors.white.withOpacity(0.4),
-                                  size: 20,
-                                ),
-                                onPressed: () {
-                                  setState(() => _obscurePassword = !_obscurePassword);
-                                },
-                              ),
-                            ),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Insira sua senha';
-                              }
-                              if (val.length < 6) {
-                                return 'A senha deve ter no mínimo 6 caracteres';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 24),
-
-                          // Login / Signup Submit Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: FilledButton(
-                              onPressed: _isLoading ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: colors.primary,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(
-                                      _isLogin ? 'Entrar' : 'Cadastrar',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          // Divider "ou"
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Divider(
-                                  color: Colors.white.withOpacity(0.1),
-                                  thickness: 1,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Text(
-                                  'ou',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.3),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Divider(
-                                  color: Colors.white.withOpacity(0.1),
-                                  thickness: 1,
-                                ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // App Logo with Shadow
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colors.primary.withOpacity(0.4),
+                                blurRadius: 24,
+                                spreadRadius: 2,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 20),
-
-                          // Google Login Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: OutlinedButton(
-                              onPressed: _isLoading ? null : _signInWithGoogle,
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: Colors.white.withOpacity(0.12),
-                                  width: 1.5,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.white.withOpacity(0.02),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.network(
-                                    'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
-                                    height: 18,
-                                    width: 18,
-                                    errorBuilder: (context, error, stackTrace) => const Icon(
-                                      Icons.g_mobiledata,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    'Entrar com o Google',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.asset(
+                              'lib/core/assets/kordapp_icon_192x192/screen.png',
+                              width: 96,
+                              height: 96,
+                              fit: BoxFit.cover,
                             ),
                           ),
-                          const SizedBox(height: 32),
-
-                          // Toggle Auth Mode (Login / Signup)
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _isLogin = !_isLogin;
-                                _formKey.currentState?.reset();
-                              });
-                            },
-                            child: RichText(
-                              text: TextSpan(
-                                style: const TextStyle(fontSize: 14),
-                                children: [
-                                  TextSpan(
-                                    text: _isLogin
-                                        ? 'Não tem uma conta? '
-                                        : 'Já possui uma conta? ',
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.4),
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: _isLogin ? 'Cadastre-se' : 'Faça Login',
-                                    style: TextStyle(
-                                      color: colors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                        ),
+                        const SizedBox(height: 24),
+                        
+                        Text(
+                          'KordApp',
+                          style: GoogleFonts.outfit(
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 1.2,
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Seu songbook digital definitivo.',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 16,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 48),
+
+                        // Google Login Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: FilledButton(
+                            onPressed: _isLoading ? null : _signInWithGoogle,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black87,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 24,
+                                    width: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.black87,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Image.network(
+                                        'https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg',
+                                        height: 24,
+                                        width: 24,
+                                        errorBuilder: (context, error, stackTrace) => const Icon(
+                                          Icons.g_mobiledata,
+                                          color: Colors.black87,
+                                          size: 32,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'Continuar com o Google',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -421,59 +220,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             spreadRadius: size * 0.1,
           ),
         ],
-      ),
-    );
-  }
-
-  InputDecoration _buildInputDecoration({
-    required String hintText,
-    required IconData icon,
-    required ColorScheme colors,
-    Widget? suffixIcon,
-  }) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(
-        color: Colors.white.withOpacity(0.1),
-        width: 1.5,
-      ),
-    );
-
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: TextStyle(
-        color: Colors.white.withOpacity(0.3),
-        fontSize: 14,
-      ),
-      prefixIcon: Icon(
-        icon,
-        color: Colors.white.withOpacity(0.4),
-        size: 20,
-      ),
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: Colors.white.withOpacity(0.02),
-      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-      border: border,
-      enabledBorder: border,
-      focusedBorder: border.copyWith(
-        borderSide: BorderSide(
-          color: colors.primary,
-          width: 1.5,
-        ),
-      ),
-      errorStyle: const TextStyle(color: Colors.redAccent),
-      errorBorder: border.copyWith(
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 1.5,
-        ),
-      ),
-      focusedErrorBorder: border.copyWith(
-        borderSide: const BorderSide(
-          color: Colors.redAccent,
-          width: 2.0,
-        ),
       ),
     );
   }

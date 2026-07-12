@@ -2,12 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../songs/repositories/song_repository.dart';
 import '../providers/manager_providers.dart';
+import '../providers/editor_provider.dart';
+import '../screens/artist_profile_workspace.dart';
 
-class ArtistsWorkspace extends ConsumerWidget {
+class ArtistsWorkspace extends ConsumerStatefulWidget {
   const ArtistsWorkspace({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ArtistsWorkspace> createState() => _ArtistsWorkspaceState();
+}
+
+class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedArtist = ref.watch(selectedArtistForViewProvider);
+    if (selectedArtist != null) {
+      return ArtistProfileWorkspace(artist: selectedArtist);
+    }
+
     final colors = Theme.of(context).colorScheme;
     final songAsync = ref.watch(songListProvider);
 
@@ -16,20 +30,43 @@ class ArtistsWorkspace extends ConsumerWidget {
         final isMobile = constraints.maxWidth < 600;
 
         return Container(
-          color: const Color(0xFF0A0F1E),
+          color: Theme.of(context).colorScheme.surface,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32, isMobile ? 20 : 32, isMobile ? 16 : 32, isMobile ? 8 : 8),
-                color: const Color(0xFF171f33),
-                child: Text(
-                  'Artistas',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: isMobile ? 20 : 32,
+                padding: EdgeInsets.fromLTRB(isMobile ? 16 : 32, isMobile ? 20 : 32, isMobile ? 16 : 32, isMobile ? 8 : 16),
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Artistas',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isMobile ? 20 : 32,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar artista...',
+                        prefixIcon: const Icon(Icons.search),
+                        filled: true,
+                        fillColor: colors.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: colors.outline.withOpacity(0.5)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: colors.outline.withOpacity(0.2)),
+                        ),
                       ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -41,12 +78,19 @@ class ArtistsWorkspace extends ConsumerWidget {
                     final artistName = song.artist.trim().isEmpty ? 'Artista Desconhecido' : song.artist.trim();
                     artistCounts[artistName] = (artistCounts[artistName] ?? 0) + 1;
                   }
-                  final artists = artistCounts.keys.toList()..sort();
+                  var artists = artistCounts.keys.toList()..sort();
+                  
+                  if (_searchQuery.isNotEmpty) {
+                    artists = artists.where((a) => a.toLowerCase().contains(_searchQuery)).toList();
+                  }
 
                   if (artists.isEmpty) {
-                    return const Expanded(
+                    return Expanded(
                       child: Center(
-                        child: Text('Nenhum artista com músicas cadastradas.'),
+                        child: Text(
+                          _searchQuery.isNotEmpty ? 'Nenhum artista encontrado.' : 'Nenhum artista com músicas cadastradas.',
+                          style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
                       ),
                     );
                   }
@@ -58,8 +102,8 @@ class ArtistsWorkspace extends ConsumerWidget {
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: isMobile ? 16 : 32),
                           child: Text(
-                            '${artists.length} artistas no total',
-                            style: Theme.of(context).textTheme.bodyMedium,
+                            '${artists.length} ${_searchQuery.isNotEmpty ? "artistas encontrados" : "artistas no total"}',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -69,57 +113,84 @@ class ArtistsWorkspace extends ConsumerWidget {
                               horizontal: isMobile ? 12 : 32,
                               vertical: isMobile ? 8 : 0,
                             ),
-                            maxCrossAxisExtent: isMobile ? 180 : 240,
-                            crossAxisSpacing: isMobile ? 10 : 16,
-                            mainAxisSpacing: isMobile ? 10 : 16,
-                            childAspectRatio: isMobile ? 1.0 : 1.1,
+                            maxCrossAxisExtent: isMobile ? 180 : 220,
+                            crossAxisSpacing: isMobile ? 10 : 20,
+                            mainAxisSpacing: isMobile ? 10 : 20,
+                            childAspectRatio: isMobile ? 1.0 : 0.9,
                             children: artists.map((artist) {
                               final count = artistCounts[artist] ?? 0;
                               return InkWell(
                                 onTap: () {
-                                  ref.read(songFilterProvider.notifier).setArtist(artist);
-                                  ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                                  ref.read(selectedArtistForViewProvider.notifier).state = artist;
                                 },
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  padding: EdgeInsets.all(isMobile ? 12 : 16),
+                                  padding: EdgeInsets.all(isMobile ? 12 : 20),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF131b2e),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: colors.outline.withOpacity(0.5),
-                                    ),
+                                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Container(
-                                        width: isMobile ? 34 : 40,
-                                        height: isMobile ? 34 : 40,
+                                        width: isMobile ? 64 : 80,
+                                        height: isMobile ? 64 : 80,
                                         decoration: BoxDecoration(
-                                          color: colors.surface,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: colors.outline),
+                                          gradient: LinearGradient(
+                                            colors: [colors.primary, colors.primary.withOpacity(0.6)],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          ),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: colors.primary.withOpacity(0.3),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
                                         ),
-                                        child: Icon(Icons.person, color: colors.primary, size: isMobile ? 20 : 24),
+                                        child: Center(
+                                          child: Text(
+                                            artist.substring(0, 1).toUpperCase(),
+                                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ),
                                       ),
                                       const Spacer(),
                                       Text(
                                         artist,
+                                        textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: isMobile ? 13 : 16,
-                                          color: Colors.white,
+                                          fontSize: isMobile ? 14 : 16,
+                                          color: colors.onSurface,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '$count ${count == 1 ? "música" : "músicas"}',
-                                        style: TextStyle(
-                                          color: colors.onSurfaceVariant,
-                                          fontSize: isMobile ? 11 : 12,
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: colors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '$count ${count == 1 ? "música" : "músicas"}',
+                                          style: TextStyle(
+                                            color: colors.primary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: isMobile ? 11 : 12,
+                                          ),
                                         ),
                                       ),
                                     ],

@@ -8,6 +8,10 @@ class CifraClubParser {
   static const String _proxyBaseUrl = 'https://cifra-proxy.nivaldo-nilngn.workers.dev';
 
   static Future<String> fetchAndParse(String url) async {
+    if (!url.toLowerCase().contains('cifraclub')) {
+      throw Exception('A URL informada não pertence ao Cifra Club. Por favor, cole um link válido.');
+    }
+
     final proxyUrl = '$_proxyBaseUrl?url=' + Uri.encodeComponent(url);
     try {
       final response = await http.get(Uri.parse(proxyUrl));

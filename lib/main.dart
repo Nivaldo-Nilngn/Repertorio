@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_provider.dart';
+import 'core/theme/settings_provider.dart';
 import 'features/manager/screens/manager_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -14,7 +18,6 @@ void main() async {
   const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
   const appId = String.fromEnvironment('FIREBASE_APP_ID');
 
-  // Detecta build sem as variáveis de ambiente necessárias (ex: flutter run sem flags ou Netlify sem env vars)
   if (apiKey.isEmpty || projectId.isEmpty || appId.isEmpty) {
     runApp(const _MissingConfigApp());
     return;
@@ -24,7 +27,25 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  runApp(const ProviderScope(child: KordApp()));
+  try {
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+  } catch (e) {
+    // Ignore, in case it's already set or not supported
+  }
+
+  final sharedPreferences = await SharedPreferences.getInstance();
+
+  runApp(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const KordApp(),
+    ),
+  );
 }
 
 class _MissingConfigApp extends StatelessWidget {
@@ -78,11 +99,19 @@ class KordApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+    final appThemeType = ref.watch(appThemeProvider);
+    final settings = ref.watch(settingsProvider);
 
     return MaterialApp(
       title: 'KordApp',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.managerTheme,
+      theme: AppTheme.resolveWithCustomSettings(
+        appThemeType,
+        primaryHex: settings.customThemeColorHex,
+        bgHex: settings.customBgColorHex,
+        textHex: settings.customTextColorHex,
+        fontFamily: settings.fontFamily,
+      ),
       home: authState.when(
         data: (user) {
           if (user != null) {
@@ -92,12 +121,31 @@ class KordApp extends ConsumerWidget {
         },
         loading: () => const Scaffold(
           body: Center(
-            child: CircularProgressIndicator(),
+            child: CircularProgressIndicator(color: AppTheme.primaryColor),
           ),
         ),
         error: (err, stack) => Scaffold(
           body: Center(
-            child: Text('Erro: $err'),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Não foi possível conectar ao servidor.',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Por favor, verifique sua conexão e tente novamente.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

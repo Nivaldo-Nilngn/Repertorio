@@ -220,21 +220,82 @@ class SongRoadmapBuilder {
     String? paragraphHint;
     String? paragraphRepetition;
 
+    List<RoadmapRow> _processParagraphMeasures(List<List<String>> measures, String? hint, String? baseRepetition) {
+      if (measures.isEmpty) return [];
+      
+      List<RoadmapRow> result = [];
+      List<List<String>> current = List.from(measures);
+      
+      while (current.isNotEmpty) {
+        bool foundSplit = false;
+        
+        for (int start = 0; start <= current.length - 2; start++) {
+          int maxL = (current.length - start) ~/ 2;
+          for (int L = maxL; L >= 1; L--) {
+            final chunk1 = current.sublist(start, start + L);
+            final chunk2 = current.sublist(start + L, start + 2 * L);
+            if (_areMeasuresEqual(chunk1, chunk2)) {
+              if (start > 0) {
+                result.add(RoadmapRow(
+                  hint: result.isEmpty ? hint : null,
+                  measures: current.sublist(0, start),
+                ));
+              }
+              
+              int count = 2;
+              int nextIdx = start + 2 * L;
+              while (nextIdx + L <= current.length) {
+                final nextChunk = current.sublist(nextIdx, nextIdx + L);
+                if (_areMeasuresEqual(chunk1, nextChunk)) {
+                  count++;
+                  nextIdx += L;
+                } else {
+                  break;
+                }
+              }
+              
+              result.add(RoadmapRow(
+                hint: (start == 0 && result.isEmpty) ? hint : null,
+                measures: chunk1,
+                repetition: '${count}x',
+              ));
+              
+              current = current.sublist(nextIdx);
+              foundSplit = true;
+              break;
+            }
+          }
+          if (foundSplit) break;
+        }
+        
+        if (!foundSplit) {
+          result.add(RoadmapRow(
+            hint: result.isEmpty ? hint : null,
+            measures: current,
+            repetition: (result.length == 0) ? baseRepetition : null,
+          ));
+          break;
+        }
+      }
+      
+      if (result.length == 1 && baseRepetition != null && result[0].repetition == null) {
+        result[0] = RoadmapRow(
+          hint: result[0].hint,
+          measures: result[0].measures,
+          repetition: baseRepetition,
+        );
+      }
+      
+      return result;
+    }
+
     void saveCurrentParagraph() {
       if (paragraphMeasures.isNotEmpty) {
         final measuresCopy = List<List<String>>.from(paragraphMeasures);
-        final repResult = _detectRepetitions(measuresCopy);
         
-        String? finalRepetition = paragraphRepetition;
-        if (repResult.count > 1) {
-          finalRepetition = '${repResult.count}x';
-        }
-
-        currentRows.add(RoadmapRow(
-          hint: paragraphHint,
-          measures: repResult.collapsedMeasures,
-          repetition: finalRepetition,
-        ));
+        // Use our new dynamic splitting and repetition detector
+        final processedRows = _processParagraphMeasures(measuresCopy, paragraphHint, paragraphRepetition);
+        currentRows.addAll(processedRows);
         
         paragraphMeasures.clear();
         paragraphHint = null;
