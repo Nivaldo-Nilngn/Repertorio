@@ -184,7 +184,20 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
   void _saveToFirebase() async {
     final title = _titleController.text.trim().isEmpty ? 'Unknown Title' : _titleController.text.trim();
     final artist = _artistController.text.trim().isEmpty ? 'Unknown Artist' : _artistController.text.trim();
+    final videoUrl = _videoUrlController.text.trim();
     final key = _selectedKey == 'Detectar' ? 'C' : _selectedKey;
+
+    if (videoUrl.isNotEmpty) {
+      final ytRegex = RegExp(r'^(https?\:\/\/)?((www\.)?youtube\.com|youtu\.?be)\/.+$');
+      if (!ytRegex.hasMatch(videoUrl)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro: URL do YouTube inválida. Verifique o link inserido.'), backgroundColor: Colors.red),
+          );
+        }
+        return;
+      }
+    }
     
     final selectedSongId = ref.read(selectedSongIdProvider);
     final songId = selectedSongId ?? title.toLowerCase().replaceAll(RegExp(r'[\s/.#\$\[\]]+'), '_');

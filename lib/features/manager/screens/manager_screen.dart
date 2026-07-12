@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../../core/providers/connectivity_provider.dart';
 import '../widgets/songs_workspace.dart';
 import '../widgets/editor_workspace.dart';
 import '../widgets/arrange_workspace.dart';
@@ -309,6 +310,20 @@ E os acordes [G]entre colchetes
     );
   }
 
+  Widget _buildOfflineBanner(bool isOffline, ColorScheme colors) {
+    if (!isOffline) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      color: Colors.redAccent.withOpacity(0.9),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: const Text(
+        '☁ Você está offline. Exibindo músicas salvas no dispositivo.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
   // ─── MOBILE LAYOUT ───────────────────────────────────────────────────────────
 
   Widget _buildMobileLayout(BuildContext context, SidebarTab activeTab, String displayName, String? photoUrl, WidgetRef ref) {
@@ -317,7 +332,12 @@ E os acordes [G]entre colchetes
     return Scaffold(
       backgroundColor: colors.surface,
       appBar: _buildMobileAppBar(context, activeTab, displayName, photoUrl, colors),
-      body: _buildMainWorkspace(activeTab, ref),
+      body: Column(
+        children: [
+          _buildOfflineBanner(ref.watch(isOfflineProvider), colors),
+          Expanded(child: _buildMainWorkspace(activeTab, ref)),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(activeTab, colors),
       floatingActionButton: _buildFAB(activeTab, colors),
     );
@@ -503,6 +523,7 @@ E os acordes [G]entre colchetes
     final appMenu = AppMenu(
       onAddSong: _showAddSongDialog,
       onLogout: _showLogoutDialog,
+      isTopMenu: isTopMenu,
     );
     final workspace = Expanded(child: _buildMainWorkspace(activeTab, ref));
 
@@ -520,9 +541,16 @@ E os acordes [G]entre colchetes
             ],
           );
         },
-        child: isTopMenu
-            ? SizedBox.expand(key: const ValueKey('topMenuLayout'), child: Column(children: [appMenu, workspace]))
-            : SizedBox.expand(key: const ValueKey('sidebarLayout'), child: Row(children: [appMenu, workspace])),
+        child: Column(
+          children: [
+            _buildOfflineBanner(ref.watch(isOfflineProvider), Theme.of(context).colorScheme),
+            Expanded(
+              child: isTopMenu
+                  ? SizedBox.expand(key: const ValueKey('topMenuLayout'), child: Column(children: [appMenu, workspace]))
+                  : SizedBox.expand(key: const ValueKey('sidebarLayout'), child: Row(children: [appMenu, workspace])),
+            ),
+          ],
+        ),
       ),
     );
   }

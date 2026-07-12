@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
@@ -50,6 +51,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   bool _showChordsPanel = false;
   bool _isRoadmapMode = true;
   bool _isMultiColumn = false;
+  late bool _isFavoriteLocal;
 
   bool _showFab = true;
   Timer? _fabTimer;
@@ -79,9 +81,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _isFavoriteLocal = widget.isFavorite;
     _parsedSong = ChordProParser.parse(widget.chordProText);
     _registerVideoIframe();
-    _fontSize.value = (ref.read(settingsProvider).defaultFontSize + 6.0).clamp(10.0, 48.0);
+    _fontSize.value = (ref.read(settingsProvider).defaultFontSize + 2.0).clamp(10.0, 48.0);
     _scrollController.addListener(_onScroll);
     _startFabTimer();
   }
@@ -98,12 +101,12 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
       // Create the iframe element regardless (we always want a fresh reference)
       _youtubeIframe = html.IFrameElement()
-        ..width = '240'
-        ..height = '135'
+        ..width = '100%'
+        ..height = '100%'
         ..src = 'https://www.youtube.com/embed/$videoId?enablejsapi=1&autoplay=0'
         ..style.border = 'none'
-        ..style.width = '240px'
-        ..style.height = '135px'
+        ..style.width = '100%'
+        ..style.height = '100%'
         ..allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
         ..allowFullscreen = true;
 
@@ -125,15 +128,17 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
+    _fabTimer?.cancel();
+    _scrollController.dispose();
     _fontSize.dispose();
     _transposeSteps.dispose();
     _instrument.dispose();
-    _autoScrollTimer?.cancel();
-    _scrollController.dispose();
     super.dispose();
   }
 
   void _toggleAutoScroll() {
+    HapticFeedback.lightImpact();
     if (_isAutoScrolling) {
       _autoScrollTimer?.cancel();
       setState(() => _isAutoScrolling = false);
@@ -154,6 +159,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
 
   void _changeScrollSpeed(double delta) {
+    HapticFeedback.lightImpact();
     setState(() {
       _scrollSpeed = (_scrollSpeed + delta).clamp(0.5, 5.0);
     });
@@ -281,7 +287,13 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
   
   void _changeFontSize(double delta) {
+    HapticFeedback.lightImpact();
     _fontSize.value = (_fontSize.value + delta).clamp(10.0, 48.0);
+  }
+
+  void _changeTranspose(int delta) {
+    HapticFeedback.lightImpact();
+    _transposeSteps.value += delta;
   }
 
   @override
@@ -291,6 +303,11 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       setState(() {
         _parsedSong = ChordProParser.parse(widget.chordProText);
         _registerVideoIframe();
+      });
+    }
+    if (oldWidget.isFavorite != widget.isFavorite) {
+      setState(() {
+        _isFavoriteLocal = widget.isFavorite;
       });
     }
   }
@@ -327,10 +344,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         _scrollBy(200);
         break;
       case 'tone_up':
-        _transposeSteps.value++;
+        _changeTranspose(1);
         break;
       case 'tone_down':
-        _transposeSteps.value--;
+        _changeTranspose(-1);
         break;
       // next_song and prev_song can be implemented later by notifying the manager
     }
@@ -346,12 +363,16 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
     final colors = Theme.of(context).colorScheme;
 
-    // On mobile (hideAppBar=false), show a proper full-screen page with AppBar
-    if (!widget.hideAppBar) {
-      return Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: colors.surface,
-        appBar: AppBar(
+    // Layout responsivo
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth > 800;
+
+        if (!isDesktop) {
+          return Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: widget.hideAppBar ? Colors.transparent : colors.surface,
+            appBar: widget.hideAppBar ? null : AppBar(
           backgroundColor: colors.surfaceContainer,
           elevation: 0,
           leading: IconButton(
@@ -391,11 +412,17 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             if (widget.onFavoriteToggle != null)
               IconButton(
                 icon: Icon(
-                  widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: widget.isFavorite ? Colors.orange : colors.onSurfaceVariant,
+                  _isFavoriteLocal ? Icons.favorite : Icons.favorite_border,
+                  color: _isFavoriteLocal ? Colors.orange : colors.onSurfaceVariant,
                 ),
-                onPressed: widget.onFavoriteToggle,
-                tooltip: widget.isFavorite ? 'Remover dos favoritos' : 'Favoritar',
+                onPressed: () {
+                  setState(() {
+                    HapticFeedback.lightImpact();
+                      _isFavoriteLocal = !_isFavoriteLocal;
+                  });
+                  widget.onFavoriteToggle!();
+                },
+                tooltip: _isFavoriteLocal ? 'Remover dos favoritos' : 'Favoritar',
               ),
             // Auto-scroll toggle
             IconButton(
@@ -431,14 +458,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   AnimatedBuilder(
                     animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
                     builder: (context, _) {
-                      if (_isRoadmapMode) {
-                        return _buildRoadmapContent();
-                      } else {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _buildLyricsContent(),
-                        );
-                      }
+                      final child = _isRoadmapMode
+                          ? _buildRoadmapContent()
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _buildLyricsContent(),
+                            );
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (Widget child, Animation<double> animation) {
+                          return FadeTransition(opacity: animation, child: child);
+                        },
+                        child: child,
+                      );
                     },
                   ),
                 ],
@@ -547,7 +579,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                               child: InkWell(
                                 onTap: () {
                                   _startFabTimer();
-                                  _transposeSteps.value--;
+                                  _changeTranspose(-1);
                                 },
                                 child: Center(
                                   child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
@@ -559,7 +591,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                               child: InkWell(
                                 onTap: () {
                                   _startFabTimer();
-                                  _transposeSteps.value++;
+                                  _changeTranspose(1);
                                 },
                                 child: Center(
                                   child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
@@ -579,10 +611,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           ),
         ),
       );
-    }
+        }
 
-    // Desktop layout (hideAppBar=true)
-    return Scaffold(
+        // Desktop layout
+        return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
       body: SafeArea(
@@ -619,14 +651,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                         AnimatedBuilder(
                                           animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
                                           builder: (context, _) {
-                                            if (_isRoadmapMode) {
-                                              return _buildRoadmapContent();
-                                            } else {
-                                              return SingleChildScrollView(
-                                                scrollDirection: Axis.horizontal,
-                                                child: _buildLyricsContent(),
-                                              );
-                                            }
+                                            final child = _isRoadmapMode
+                                                ? _buildRoadmapContent()
+                                                : SingleChildScrollView(
+                                                    scrollDirection: Axis.horizontal,
+                                                    child: _buildLyricsContent(),
+                                                  );
+                                            return AnimatedSwitcher(
+                                              duration: const Duration(milliseconds: 300),
+                                              transitionBuilder: (Widget child, Animation<double> animation) {
+                                                return FadeTransition(opacity: animation, child: child);
+                                              },
+                                              child: child,
+                                            );
                                           },
                                         ),
                                       ],
@@ -692,9 +729,11 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         ),
       ),
     );
+      },
+    );
   }
 
-  Widget _buildFloatingTile(IconData icon, String label, VoidCallback onTap, ColorScheme colors) {
+  Widget _buildFloatingTile(IconData icon, String label, VoidCallback onTap, ColorScheme colors, {bool isActive = false}) {
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
       child: InkWell(
@@ -707,8 +746,11 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           width: 60,
           height: 60,
           decoration: BoxDecoration(
-            color: colors.surfaceContainer,
-            border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
+            color: isActive ? colors.primary.withOpacity(0.15) : colors.surfaceContainer,
+            border: Border.all(
+              color: isActive ? colors.primary : colors.outlineVariant.withOpacity(0.2), 
+              width: 1.5
+            ),
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
@@ -721,14 +763,14 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 20, color: colors.onSurfaceVariant),
+              Icon(icon, size: 20, color: isActive ? colors.primary : colors.onSurfaceVariant),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
-                  color: colors.onSurfaceVariant,
+                  color: isActive ? colors.primary : colors.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -835,7 +877,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                             children: [
                               Expanded(
                                 child: InkWell(
-                                  onTap: () => _transposeSteps.value--,
+                                  onTap: () => _changeTranspose(-1),
                                   child: Center(
                                     child: Icon(Icons.remove, size: 18, color: colors.onSurfaceVariant),
                                   ),
@@ -844,7 +886,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                               VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
                               Expanded(
                                 child: InkWell(
-                                  onTap: () => _transposeSteps.value++,
+                                  onTap: () => _changeTranspose(1),
                                   child: Center(
                                     child: Icon(Icons.add, size: 18, color: colors.onSurfaceVariant),
                                   ),
@@ -893,12 +935,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                     isActive: _videoState != VideoDisplayState.hidden,
                   ),
 
-                _buildSidebarTile(
-                  icon: widget.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  label: 'Favorito',
-                  onTap: widget.onFavoriteToggle ?? () {},
-                  isActive: widget.isFavorite,
-                ),
+                if (widget.onFavoriteToggle != null)
+                  _buildSidebarTile(
+                    icon: _isFavoriteLocal ? Icons.favorite : Icons.favorite_border,
+                    label: 'Favorito',
+                    onTap: () {
+                      setState(() {
+                        HapticFeedback.lightImpact();
+                      _isFavoriteLocal = !_isFavoriteLocal;
+                      });
+                      widget.onFavoriteToggle!();
+                    },
+                    isActive: _isFavoriteLocal,
+                  ),
 
                 _buildSidebarTile(
                   icon: Icons.view_column,
@@ -1284,16 +1333,21 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
 
   Widget _buildVideoPlaceholder() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.black,
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.hardEdge,
-      child: AspectRatio(
-        aspectRatio: 16 / 9,
-        child: HtmlElementView(viewType: 'youtube-iframe-${_parsedSong.video}'),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 340), // Limita o tamanho máximo na tela
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.black,
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+          ),
+          clipBehavior: Clip.hardEdge,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: HtmlElementView(viewType: 'youtube-iframe-${_parsedSong.video}'),
+          ),
+        ),
       ),
     );
   }
@@ -1755,7 +1809,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           else if (chords != null)
             LayoutBuilder(
               builder: (context, constraints) {
-                final blockWidth = ((constraints.maxWidth - 32.0) / 5).clamp(45.0, 80.0);
+                final blockWidth = (constraints.maxWidth - (8.0 * 4)) / 5;
                 return Wrap(
                   spacing: 8.0,
                   runSpacing: 8.0,
@@ -1778,14 +1832,20 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.3)),
       ),
-      child: Text(
-        chord,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontFamily: 'Consolas',
-          fontSize: _fontSize.value,
-          fontWeight: FontWeight.bold,
-          color: _getChordColor(),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Text(
+          chord,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          softWrap: false,
+          style: TextStyle(
+            fontFamily: 'Consolas',
+            fontSize: _fontSize.value - 6.0,
+            fontWeight: FontWeight.bold,
+            color: _getChordColor(),
+          ),
         ),
       ),
     );
@@ -1936,7 +1996,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   style: TextStyle(
                     color: _getLyricColor(),
                     fontStyle: FontStyle.italic,
-                    fontSize: _fontSize.value - 2.0,
+                    fontSize: _fontSize.value - 4.0,
                     fontWeight: FontWeight.w500,
                   ),
               ),
@@ -1948,7 +2008,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final blockWidth = ((constraints.maxWidth - 32.0) / 5).clamp(45.0, 80.0);
+                    final blockWidth = (constraints.maxWidth - (8.0 * 4)) / 5;
                     return Wrap(
                       spacing: 8.0,
                       runSpacing: 8.0,
@@ -1987,21 +2047,27 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       cells.add(
         Container(
           width: blockWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: colors.outline.withOpacity(0.3)),
           ),
-          child: Text(
-            transposedChords,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Consolas',
-              fontSize: _fontSize.value - 2.0,
-              fontWeight: FontWeight.bold,
-              color: _getChordColor(),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text(
+              transposedChords,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(
+                fontFamily: 'Consolas',
+                fontSize: _fontSize.value - 6.0,
+                fontWeight: FontWeight.bold,
+                color: _getChordColor(),
+              ),
             ),
           ),
         ),

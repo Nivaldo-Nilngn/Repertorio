@@ -124,10 +124,8 @@ class AppTheme {
       try { bgColor = Color(int.parse(bgHex.replaceFirst('#', '0xFF'))); } catch (_) {}
     }
 
-    Color textColor = Colors.white;
-    if (textHex != null) {
-      try { textColor = Color(int.parse(textHex.replaceFirst('#', '0xFF'))); } catch (_) {}
-    }
+    // Calcula a luminância do fundo automaticamente para escolher entre texto preto ou branco
+    Color textColor = bgColor.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
     final baseTextTheme = TextTheme(
       displayLarge: TextStyle(fontSize: 48, fontWeight: FontWeight.w700, color: textColor),

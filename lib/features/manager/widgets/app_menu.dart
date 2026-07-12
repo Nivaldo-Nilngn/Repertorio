@@ -20,11 +20,13 @@ class MenuItemData {
 class AppMenu extends ConsumerStatefulWidget {
   final VoidCallback onAddSong;
   final VoidCallback onLogout;
+  final bool isTopMenu;
 
   const AppMenu({
     super.key,
     required this.onAddSong,
     required this.onLogout,
+    this.isTopMenu = false,
   });
 
   @override
@@ -43,7 +45,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
 
   @override
   Widget build(BuildContext context) {
-    final isTopMenu = ref.watch(isTopMenuProvider);
+    final isTopMenu = widget.isTopMenu;
     final colors = Theme.of(context).colorScheme;
 
     if (isTopMenu) {
