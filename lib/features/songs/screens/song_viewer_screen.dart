@@ -59,8 +59,23 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   void _startFabTimer() {
     _fabTimer?.cancel();
     _fabTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && !_isAutoScrolling) {
+      if (mounted && !_isAutoScrolling && !_isFabPinned) {
         setState(() => _showFab = false);
+      }
+    });
+  }
+
+  bool _isFabPinned = false;
+  
+  void _toggleFabPin() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isFabPinned = !_isFabPinned;
+      if (_isFabPinned) {
+        _showFab = true;
+        _fabTimer?.cancel();
+      } else {
+        _startFabTimer();
       }
     });
   }
@@ -353,6 +368,55 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     }
   }
 
+  Widget _buildPinnedBottomBar(ColorScheme colors) {
+    return BottomAppBar(
+      color: colors.surfaceContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      height: 64,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Font size
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('TEXTO', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: const Icon(Icons.remove, size: 20), onPressed: () => _changeFontSize(-2), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                  const SizedBox(width: 12),
+                  IconButton(icon: const Icon(Icons.add, size: 20), onPressed: () => _changeFontSize(2), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                ],
+              ),
+            ],
+          ),
+          // Transpose
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('TOM', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: const Icon(Icons.remove, size: 20), onPressed: () => _changeTranspose(-1), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                  const SizedBox(width: 12),
+                  IconButton(icon: const Icon(Icons.add, size: 20), onPressed: () => _changeTranspose(1), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                ],
+              ),
+            ],
+          ),
+          // Rolagem
+          IconButton(icon: Icon(Icons.unfold_more, color: _isAutoScrolling ? colors.primary : colors.onSurfaceVariant), onPressed: _toggleAutoScroll),
+          // Dicionario
+          IconButton(icon: Icon(Icons.menu_book, color: colors.onSurfaceVariant), onPressed: _showChordsDictionaryDialog),
+          // Unpin
+          IconButton(icon: Icon(Icons.push_pin, color: colors.primary), onPressed: _toggleFabPin),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<String?>(midiActionStreamProvider, (previous, next) {
@@ -486,7 +550,8 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               ),
           ],
         ),
-        floatingActionButton: IgnorePointer(
+        bottomNavigationBar: _isFabPinned ? _buildPinnedBottomBar(colors) : null,
+        floatingActionButton: _isFabPinned ? null : IgnorePointer(
           ignoring: !_showFab,
           child: AnimatedOpacity(
             opacity: _showFab ? 1.0 : 0.0,
@@ -606,6 +671,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 ),
                 _buildFloatingTile(Icons.unfold_more, 'Rolagem', _toggleAutoScroll, colors),
                 _buildFloatingTile(Icons.menu_book, 'Dicionário', _showChordsDictionaryDialog, colors),
+                _buildFloatingTile(Icons.push_pin_outlined, 'Fixar', _toggleFabPin, colors),
               ],
             ),
           ),
