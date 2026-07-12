@@ -271,14 +271,17 @@ E os acordes [G]entre colchetes
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('CANCELAR', style: TextStyle(color: Colors.white54)),
+              child: Text('CANCELAR', style: TextStyle(color: colors.onSurfaceVariant)),
             ),
             FilledButton(
               onPressed: () async {
                 Navigator.pop(context);
                 await FirebaseAuth.instance.signOut();
               },
-              style: FilledButton.styleFrom(backgroundColor: colors.error),
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
+              ),
               child: const Text('SAIR'),
             ),
           ],
@@ -363,8 +366,39 @@ E os acordes [G]entre colchetes
       ),
       actions: [
 
-        GestureDetector(
-          onTap: _showLogoutDialog,
+        PopupMenuButton<String>(
+          offset: const Offset(0, 48),
+          color: colors.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          onSelected: (value) {
+            if (value == 'settings') {
+              ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.settings);
+            } else if (value == 'logout') {
+              _showLogoutDialog();
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'settings',
+              child: Row(
+                children: [
+                  Icon(Icons.settings, size: 20, color: colors.onSurface),
+                  const SizedBox(width: 12),
+                  Text('Configurações', style: TextStyle(color: colors.onSurface)),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  Icon(Icons.logout, size: 20, color: colors.error),
+                  const SizedBox(width: 12),
+                  Text('Sair', style: TextStyle(color: colors.error)),
+                ],
+              ),
+            ),
+          ],
           child: Container(
             margin: const EdgeInsets.only(right: 12),
             child: CircleAvatar(

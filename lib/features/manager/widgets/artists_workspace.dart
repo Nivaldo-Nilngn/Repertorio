@@ -116,7 +116,7 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                             maxCrossAxisExtent: isMobile ? 180 : 220,
                             crossAxisSpacing: isMobile ? 10 : 20,
                             mainAxisSpacing: isMobile ? 10 : 20,
-                            childAspectRatio: isMobile ? 1.0 : 0.9,
+                            childAspectRatio: isMobile ? 0.85 : 0.9,
                             children: artists.map((artist) {
                               final count = artistCounts[artist] ?? 0;
                               return InkWell(
@@ -125,7 +125,7 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                                 },
                                 borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  padding: EdgeInsets.all(isMobile ? 12 : 20),
+                                  padding: EdgeInsets.all(isMobile ? 8 : 20),
                                   decoration: BoxDecoration(
                                     color: Theme.of(context).colorScheme.surfaceContainerHigh,
                                     borderRadius: BorderRadius.circular(16),
@@ -141,8 +141,8 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Container(
-                                        width: isMobile ? 64 : 80,
-                                        height: isMobile ? 64 : 80,
+                                        width: isMobile ? 56 : 80,
+                                        height: isMobile ? 56 : 80,
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [colors.primary, colors.primary.withOpacity(0.6)],
@@ -161,25 +161,26 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                                         child: Center(
                                           child: Text(
                                             artist.substring(0, 1).toUpperCase(),
-                                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                                            style: TextStyle(fontSize: isMobile ? 24 : 32, fontWeight: FontWeight.bold, color: Colors.white),
                                           ),
                                         ),
                                       ),
-                                      const Spacer(),
+                                      const SizedBox(height: 8),
                                       Text(
                                         artist,
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: isMobile ? 14 : 16,
+                                          fontSize: isMobile ? 12 : 16,
                                           color: colors.onSurface,
+                                          height: 1.1,
                                         ),
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 4),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: colors.primary.withOpacity(0.1),
                                           borderRadius: BorderRadius.circular(12),
@@ -189,7 +190,7 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                                           style: TextStyle(
                                             color: colors.primary,
                                             fontWeight: FontWeight.w600,
-                                            fontSize: isMobile ? 11 : 12,
+                                            fontSize: isMobile ? 10 : 12,
                                           ),
                                         ),
                                       ),

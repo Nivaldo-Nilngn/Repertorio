@@ -151,21 +151,6 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                       suffixIcon: Icon(Icons.calendar_today),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  CheckboxListTile(
-                    title: const Text('Modelo de Culto Padrão', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Estrutura automática de louvor, avisos e pregação', style: TextStyle(fontSize: 11)),
-                    value: initializeWithTemplate,
-                    onChanged: (v) {
-                      if (v != null) {
-                        setDialogState(() {
-                          initializeWithTemplate = v;
-                        });
-                      }
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
                 ],
               ),
               actions: [
@@ -181,32 +166,17 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
 
                     final id = FirebaseDatabase.instance.ref('setlists').push().key ?? DateTime.now().millisecondsSinceEpoch.toString();
                     
-                    final List<SetlistItem> initialItems = [];
-                    if (initializeWithTemplate) {
-                      initialItems.addAll([
-                        const SetlistItem(type: 'note', title: 'Celebração (Música 1)', subtitle: '4:00', duration: '4:00', colorHex: '#ffb95f'),
-                        const SetlistItem(type: 'note', title: 'Celebração (Música 2)', subtitle: '4:00', duration: '4:00', colorHex: '#ffb95f'),
-                        const SetlistItem(type: 'note', title: 'Adoração (Música 1)', subtitle: '4:00', duration: '4:00', colorHex: '#4edea3'),
-                        const SetlistItem(type: 'note', title: 'Adoração (Música 2)', subtitle: '4:00', duration: '4:00', colorHex: '#4edea3'),
-                        const SetlistItem(type: 'note', title: 'Avisos da Mídia', subtitle: '5:00', duration: '5:00', colorHex: '#adc6ff'),
-                        const SetlistItem(type: 'note', title: 'Dízimos e Ofertas', subtitle: '4:00', duration: '4:00', colorHex: '#adc6ff'),
-                        const SetlistItem(type: 'note', title: 'Chamada para Pregação (Música)', subtitle: '4:00', duration: '4:00', colorHex: '#b19ffb'),
-                        const SetlistItem(type: 'note', title: 'Pregação (Mensagem)', subtitle: '30:00', duration: '30:00', colorHex: '#b19ffb'),
-                        const SetlistItem(type: 'note', title: 'Encerramento (Música Opcional)', subtitle: '4:00', duration: '4:00', colorHex: '#ff8b8b'),
-                      ]);
-                    }
-
                     final newSetlist = SongSetlist(
                       id: id,
                       name: name,
                       date: date,
-                      items: initialItems,
+                      items: [],
                     );
 
                     await ref.read(songRepositoryProvider).createSetlist(newSetlist);
                     setState(() {
                       _activeSetlist = newSetlist;
-                      _isDirty = initializeWithTemplate;
+                      _isDirty = false;
                     });
                     if (mounted) {
                       Navigator.pop(context);
@@ -246,6 +216,70 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
 
   void _addNoteToSetlist() {
     if (_activeSetlist == null) return;
+    final colors = Theme.of(context).colorScheme;
+    final predefinedBlocks = [
+      {'title': 'Celebração', 'duration': '4:00', 'colorHex': '#ffb95f'},
+      {'title': 'Adoração', 'duration': '4:00', 'colorHex': '#4edea3'},
+      {'title': 'Avisos da Mídia', 'duration': '5:00', 'colorHex': '#adc6ff'},
+      {'title': 'Dízimos e Ofertas', 'duration': '4:00', 'colorHex': '#adc6ff'},
+      {'title': 'Pregação (Mensagem)', 'duration': '30:00', 'colorHex': '#b19ffb'},
+      {'title': 'Encerramento', 'duration': '4:00', 'colorHex': '#ff8b8b'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surfaceContainer,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 40, height: 4, margin: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: colors.outline.withOpacity(0.5), borderRadius: BorderRadius.circular(2))),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('Adicionar Bloco/Aviso', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.primary)),
+              ),
+              ...predefinedBlocks.map((block) => ListTile(
+                leading: Icon(Icons.label, color: Color(int.parse(block['colorHex']!.replaceFirst('#', '0xFF')))),
+                title: Text(block['title']!),
+                subtitle: Text('Duração est: ${block['duration']}'),
+                onTap: () {
+                  final newItem = SetlistItem(
+                    type: 'note',
+                    title: block['title']!,
+                    subtitle: block['duration']!,
+                    duration: block['duration']!,
+                    colorHex: block['colorHex']!,
+                  );
+                  final updatedItems = List<SetlistItem>.from(_activeSetlist!.items)..add(newItem);
+                  setState(() {
+                    _activeSetlist = _activeSetlist!.copyWith(items: updatedItems);
+                    _isDirty = true;
+                  });
+                  Navigator.pop(context);
+                },
+              )),
+              Divider(color: colors.outline.withOpacity(0.2)),
+              ListTile(
+                leading: const Icon(Icons.add_circle_outline),
+                title: const Text('Bloco Personalizado...', style: TextStyle(fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showCustomNoteDialog();
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCustomNoteDialog() {
+    if (_activeSetlist == null) return;
     
     final noteController = TextEditingController();
     final durationController = TextEditingController(text: '3:00');
@@ -255,7 +289,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
       builder: (context) {
         return AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
-          title: const Text('Adicionar Bloco/Aviso'),
+          title: const Text('Bloco Personalizado'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -834,80 +868,97 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
   // ─── MOBILE EDITOR VIEW (tabs: Roteiro | Biblioteca) ─────────────────────────
 
   Widget _buildMobileEditorView(AsyncValue<List<Song>> songAsync, ColorScheme colors) {
-    return DefaultTabController(
-      length: 2,
-      child: Column(
+    return Scaffold(
+      backgroundColor: colors.surface,
+      body: Column(
         children: [
           // Header
           Container(
             color: Theme.of(context).colorScheme.surfaceContainer,
-            child: Column(
+            padding: const EdgeInsets.fromLTRB(4, 16, 16, 16),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () => setState(() {
-                          _activeSetlist = null;
-                          _isDirty = false;
-                        }),
-                      ),
-                      Expanded(
-                        child: Text(
-                          _activeSetlist!.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_isDirty)
-                        TextButton.icon(
-                          onPressed: _saveSetlistToFirebase,
-                          icon: const Icon(Icons.cloud_upload_outlined, size: 16),
-                          label: const Text('SALVAR'),
-                        )
-                      else
-                        Row(
-                          children: [
-                            Icon(Icons.check_circle_outline, color: colors.secondary, size: 16),
-                            const SizedBox(width: 4),
-                            Text('SALVO', style: TextStyle(color: colors.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                    ],
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() {
+                    _activeSetlist = null;
+                    _isDirty = false;
+                  }),
+                ),
+                Expanded(
+                  child: Text(
+                    _activeSetlist!.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                TabBar(
-                  tabs: const [
-                    Tab(icon: Icon(Icons.list, size: 18), text: 'Roteiro'),
-                    Tab(icon: Icon(Icons.library_music, size: 18), text: 'Biblioteca'),
-                  ],
-                  labelColor: colors.primary,
-                  unselectedLabelColor: colors.onSurfaceVariant,
-                  indicatorColor: colors.primary,
-                ),
+                if (_isDirty)
+                  TextButton.icon(
+                    onPressed: _saveSetlistToFirebase,
+                    icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                    label: const Text('SALVAR'),
+                  )
+                else
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, color: colors.secondary, size: 16),
+                      const SizedBox(width: 4),
+                      Text('SALVO', style: TextStyle(color: colors.secondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
               ],
             ),
           ),
           Expanded(
-            child: TabBarView(
-              children: [
-                // Tab 1: Setlist canvas
-                Container(
-                  color: colors.surface,
-                  child: _buildMobileSetlistCanvas(colors),
-                ),
-                // Tab 2: Biblioteca
-                Container(
-                  color: Theme.of(context).colorScheme.surfaceContainer,
-                  child: _buildBibliotecaView(songAsync, colors),
-                ),
-              ],
-            ),
+            child: _buildMobileSetlistCanvas(colors),
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          _showMobileLibraryModal(context, songAsync, colors);
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Adicionar Música'),
+        backgroundColor: colors.primary,
+        foregroundColor: colors.onPrimary,
+      ),
+    );
+  }
+
+  void _showMobileLibraryModal(BuildContext context, AsyncValue<List<Song>> songAsync, ColorScheme colors) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: colors.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return FractionallySizedBox(
+              heightFactor: 0.9,
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: colors.outline.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildBibliotecaView(songAsync, colors, setModalState: setModalState),
+                  ),
+                ],
+              ),
+            );
+          }
+        );
+      },
     );
   }
 
@@ -950,19 +1001,35 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
           child: _activeSetlist!.items.isEmpty
               ? Center(
                   child: Text(
-                    'Vazio.\nAdicione músicas na aba Biblioteca!',
+                    'Lista Vazia.\nToque no botão abaixo para adicionar músicas!',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
                   ),
                 )
-              : ListView.builder(
+              : ReorderableListView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                   itemCount: _activeSetlist!.items.length,
+                  onReorder: (oldIndex, newIndex) {
+                    if (oldIndex < newIndex) {
+                      newIndex -= 1;
+                    }
+                    if (_activeSetlist == null) return;
+                    final items = List<SetlistItem>.from(_activeSetlist!.items);
+                    final item = items.removeAt(oldIndex);
+                    items.insert(newIndex, item);
+                    setState(() {
+                      _activeSetlist = _activeSetlist!.copyWith(items: items);
+                      _isDirty = true;
+                    });
+                  },
                   itemBuilder: (context, index) {
                     final item = _activeSetlist!.items[index];
-                    return item.type == 'song'
-                        ? _buildSetlistSongItem(index, item, colors)
-                        : _buildSetlistNoteItem(index, item, colors);
+                    return Container(
+                      key: ValueKey('${item.type}_${item.title}_$index'),
+                      child: item.type == 'song'
+                          ? _buildSetlistSongItem(index, item, colors)
+                          : _buildSetlistNoteItem(index, item, colors),
+                    );
                   },
                 ),
         ),
@@ -970,7 +1037,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     );
   }
 
-  Widget _buildBibliotecaView(AsyncValue<List<Song>> songAsync, ColorScheme colors) {
+  Widget _buildBibliotecaView(AsyncValue<List<Song>> songAsync, ColorScheme colors, {StateSetter? setModalState}) {
     return Column(
       children: [
         Padding(
@@ -1064,11 +1131,28 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (_activeSetlist != null)
-                              IconButton(
-                                icon: const Icon(Icons.add_circle, size: 20),
-                                color: colors.primary,
-                                tooltip: 'Adicionar ao Repertório',
-                                onPressed: () => _addSongToSetlist(song),
+                              Builder(
+                                builder: (context) {
+                                  final isAdded = _activeSetlist!.items.any((item) => item.type == 'song' && item.title == song.title);
+                                  return IconButton(
+                                    icon: Icon(isAdded ? Icons.check_circle : Icons.add_circle, size: 20),
+                                    color: isAdded ? colors.secondary : colors.primary,
+                                    tooltip: isAdded ? 'Já Adicionada' : 'Adicionar ao Repertório',
+                                    onPressed: () {
+                                      _addSongToSetlist(song);
+                                      if (setModalState != null) {
+                                        setModalState(() {});
+                                      }
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('${song.title} adicionada ao repertório!'),
+                                          duration: const Duration(seconds: 1),
+                                          backgroundColor: colors.secondary,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                }
                               ),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
@@ -1313,78 +1397,83 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_upward, size: 16),
-                    onPressed: index > 0 ? () => _moveItem(index, -1) : null,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Icon(Icons.drag_handle, color: colors.onSurfaceVariant.withOpacity(0.5)),
                   ),
                   const SizedBox(height: 4),
                   Text('${index + 1}', style: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.5), fontFamily: 'Consolas', fontSize: 13)),
-                  const SizedBox(height: 4),
-                  IconButton(
-                    icon: const Icon(Icons.arrow_downward, size: 16),
-                    onPressed: index < _activeSetlist!.items.length - 1 ? () => _moveItem(index, 1) : null,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                 ],
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                    const SizedBox(height: 4),
-                    Text(item.subtitle, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                    Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    if (item.subtitle.isNotEmpty) ...[
+                      Text(item.subtitle, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+                    ],
+                    const SizedBox(height: 6),
+                    // Action row
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: colors.outline.withOpacity(0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Text('Tom ', style: TextStyle(color: Color(0xFFffb95f), fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
+                              Text(item.key.isEmpty ? 'C' : item.key, style: const TextStyle(fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.edit_note, size: 18),
+                          color: colors.primary,
+                          tooltip: 'Editar Música',
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          onPressed: () {
+                            final songs = ref.read(songListProvider).value ?? [];
+                            try {
+                              final matchingSong = songs.firstWhere((s) => s.title == item.title);
+                              ref.read(editingChordProProvider.notifier).state = matchingSong.content;
+                              ref.read(isEditorVisibleProvider.notifier).state = true;
+                              ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                              ref.read(songFilterProvider.notifier).clear();
+                            } catch (_) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Cifra não encontrada na Biblioteca!'), backgroundColor: Colors.orange),
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 8),
+                        _buildColorPicker(index, item, colors),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          color: Colors.redAccent,
+                          padding: const EdgeInsets.all(4),
+                          constraints: const BoxConstraints(),
+                          onPressed: () => _deleteItem(index),
+                        ),
+                        const SizedBox(width: 4),
+                      ]
+                    )
                   ],
                 ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: colors.outline.withOpacity(0.5)),
-              ),
-              child: Row(
-                children: [
-                  const Text('Tom ', style: TextStyle(color: Color(0xFFffb95f), fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text(item.key.isEmpty ? 'C' : item.key, style: const TextStyle(fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 13)),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit_note, size: 22),
-              color: colors.primary,
-              tooltip: 'Editar Música',
-              onPressed: () {
-                final songs = ref.read(songListProvider).value ?? [];
-                try {
-                  final matchingSong = songs.firstWhere((s) => s.title == item.title);
-                  ref.read(editingChordProProvider.notifier).state = matchingSong.content;
-                  ref.read(isEditorVisibleProvider.notifier).state = true;
-                  ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                  ref.read(songFilterProvider.notifier).clear();
-                } catch (_) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Cifra não encontrada na Biblioteca!'), backgroundColor: Colors.orange),
-                  );
-                }
-              },
-            ),
-            _buildColorPicker(index, item, colors),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              color: Colors.redAccent,
-              onPressed: () => _deleteItem(index),
-            ),
-            const SizedBox(width: 8),
           ],
         ),
       ),
@@ -1427,18 +1516,12 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
               style: const TextStyle(fontFamily: 'Consolas', fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.arrow_upward, size: 16),
-              onPressed: index > 0 ? () => _moveItem(index, -1) : null,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.arrow_downward, size: 16),
-              onPressed: index < _activeSetlist!.items.length - 1 ? () => _moveItem(index, 1) : null,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
+            ReorderableDragStartListener(
+              index: index,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.drag_handle, size: 20, color: colors.onSurfaceVariant.withOpacity(0.5)),
+              ),
             ),
             _buildColorPicker(index, item, colors),
             IconButton(

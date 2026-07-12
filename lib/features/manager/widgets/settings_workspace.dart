@@ -24,6 +24,34 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    if (isMobile) {
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: colors.surfaceContainer,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildMobileMenuItem(0, Icons.palette, 'Geral', colors),
+                _buildMobileMenuItem(1, Icons.piano, 'MIDI', colors),
+                _buildMobileMenuItem(2, Icons.person, 'Conta', colors),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: colors.outline.withOpacity(0.2)),
+          Expanded(
+            child: Container(
+              color: colors.surface,
+              child: _buildContent(),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -60,6 +88,30 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMobileMenuItem(int index, IconData icon, String title, ColorScheme colors) {
+    final isActive = _selectedIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _selectedIndex = index),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? colors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: isActive ? colors.onPrimary : colors.onSurfaceVariant),
+            if (isActive) ...[
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(color: colors.onPrimary, fontWeight: FontWeight.bold, fontSize: 13)),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -113,9 +165,10 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
   Widget _buildGeralTab() {
     final colors = Theme.of(context).colorScheme;
     final currentTheme = ref.watch(appThemeProvider);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(32.0),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -134,25 +187,27 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
           const SizedBox(height: 24),
           
           // Layout Toggle
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainer,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.outline.withOpacity(0.2)),
+          if (!isMobile) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.outline.withOpacity(0.2)),
+              ),
+              child: SwitchListTile(
+                title: const Text('Menu no Topo (Navbar)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Alterna entre o menu lateral clássico e o menu no topo da tela.'),
+                value: ref.watch(isTopMenuProvider),
+                onChanged: (val) {
+                  ref.read(isTopMenuProvider.notifier).toggle();
+                },
+                activeColor: colors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-            child: SwitchListTile(
-              title: const Text('Menu no Topo (Navbar)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Alterna entre o menu lateral clássico e o menu no topo da tela.'),
-              value: ref.watch(isTopMenuProvider),
-              onChanged: (val) {
-                ref.read(isTopMenuProvider.notifier).toggle();
-              },
-              activeColor: colors.primary,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-          const SizedBox(height: 32),
+            const SizedBox(height: 32),
+          ],
           
           Text(
             'Temas Clássicos',
@@ -160,8 +215,9 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
           ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 16,
-            runSpacing: 16,
+            spacing: isMobile ? 12 : 16,
+            runSpacing: isMobile ? 12 : 16,
+            alignment: WrapAlignment.center,
             children: [
               _buildThemeOption(AppThemeType.managerDark, currentTheme),
               _buildThemeOption(AppThemeType.managerLight, currentTheme),
@@ -176,8 +232,9 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
           ),
           const SizedBox(height: 16),
           Wrap(
-            spacing: 16,
-            runSpacing: 16,
+            spacing: isMobile ? 12 : 16,
+            runSpacing: isMobile ? 12 : 16,
+            alignment: WrapAlignment.center,
             children: [
               _buildThemeOption(AppThemeType.cafeteriaModerna, currentTheme),
               _buildThemeOption(AppThemeType.graoGourmet, currentTheme),
@@ -213,6 +270,7 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     final colors = Theme.of(context).colorScheme;
     final settings = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     final List<String> availableFonts = [
       'Inter', 'Roboto Mono', 'Fira Code', 'Poppins', 'Playfair Display', 'Arvo', 'Segoe UI', 'Consolas'
@@ -232,86 +290,23 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Coluna de Família de Fonte
-              Expanded(
-                flex: 1,
-                child: Column(
+          isMobile
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildFontFamilySelector(colors, selectedFont, availableFonts, settingsNotifier),
+                    const SizedBox(height: 24),
+                    _buildFontSizeSelector(colors, settings, settingsNotifier),
+                  ],
+                )
+              : Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.font_download, color: colors.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Família de Fonte', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('Altere a fonte', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: selectedFont,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      dropdownColor: colors.surfaceContainerHigh,
-                      items: availableFonts.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                      onChanged: (val) {
-                        if (val != null) settingsNotifier.setFontFamily(val);
-                      },
-                    ),
+                    Expanded(child: _buildFontFamilySelector(colors, selectedFont, availableFonts, settingsNotifier)),
+                    const SizedBox(width: 32),
+                    Expanded(child: _buildFontSizeSelector(colors, settings, settingsNotifier)),
                   ],
                 ),
-              ),
-              
-              const SizedBox(width: 32),
-              
-              // Coluna de Tamanho da Fonte
-              Expanded(
-                flex: 1,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.text_increase, color: colors.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Tamanho Padrão', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              Text('Ajuste o zoom', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                        Text('${settings.defaultFontSize.toInt()}px', style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Slider(
-                      value: settings.defaultFontSize,
-                      min: 14.0,
-                      max: 48.0,
-                      divisions: 17,
-                      onChanged: (value) {
-                        settingsNotifier.setFontSize(value);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
           
           const SizedBox(height: 32),
           Text('Preview no Palco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.onSurfaceVariant)),
@@ -356,9 +351,80 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     );
   }
 
+  Widget _buildFontFamilySelector(ColorScheme colors, String selectedFont, List<String> availableFonts, dynamic settingsNotifier) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.font_download, color: colors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Família de Fonte', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Altere a fonte', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          value: selectedFont,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          dropdownColor: colors.surfaceContainerHigh,
+          items: availableFonts.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+          onChanged: (val) {
+            if (val != null) settingsNotifier.setFontFamily(val);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFontSizeSelector(ColorScheme colors, dynamic settings, dynamic settingsNotifier) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.text_increase, color: colors.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Tamanho Padrão', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Ajuste o zoom', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
+                ],
+              ),
+            ),
+            Text('${settings.defaultFontSize.toInt()}px', style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Slider(
+          value: settings.defaultFontSize,
+          min: 14.0,
+          max: 48.0,
+          divisions: 17,
+          onChanged: (value) {
+            settingsNotifier.setFontSize(value);
+          },
+        ),
+      ],
+    );
+  }
+
   Widget _buildCustomThemeOption(AppThemeType currentType) {
     final isActive = currentType == AppThemeType.custom;
     final settings = ref.watch(settingsProvider);
+    final isMobile = MediaQuery.of(context).size.width < 600;
     
     Color primaryColor = Colors.blueGrey;
     if (settings.customThemeColorHex != null) {
@@ -379,16 +445,20 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
         if (!isActive) {
           ref.read(appThemeProvider.notifier).setTheme(AppThemeType.custom);
         } else {
-          showDialog(
-            context: context,
-            builder: (context) => const ThemeBuilderModal(),
-          );
+          if (isMobile) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeBuilderModal()));
+          } else {
+            showDialog(
+              context: context,
+              builder: (context) => const ThemeBuilderModal(),
+            );
+          }
         }
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 320, // Largura reduzida para caber no Grid
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        width: isMobile ? (MediaQuery.of(context).size.width - 60) / 3 : 320,
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 16, vertical: 12),
         decoration: BoxDecoration(
           color: themeData.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -404,35 +474,72 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
             )
           ] : [],
         ),
-        child: Row(
-          children: [
-            _buildColorPalette(themeData),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Text(
-                'Tema Personalizado',
-                style: TextStyle(
-                  color: themeData.colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+        child: isMobile 
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildColorPalette(themeData, compact: true),
+                const SizedBox(height: 8),
+                Text(
+                  'Personalizado',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: themeData.colorScheme.onSurface,
+                    fontSize: 11,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  ),
                 ),
-              ),
+                if (isActive) ...[
+                  const SizedBox(height: 6),
+                  InkWell(
+                    onTap: () {
+                      if (isMobile) {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeBuilderModal()));
+                      } else {
+                        showDialog(
+                          context: context,
+                          builder: (context) => const ThemeBuilderModal(),
+                        );
+                      }
+                    },
+                    child: Icon(Icons.palette, size: 16, color: themeData.colorScheme.primary),
+                  ),
+                ]
+              ],
+            )
+          : Row(
+              children: [
+                _buildColorPalette(themeData),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Text(
+                    'Tema Personalizado',
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (isActive) ...[
+                  IconButton(
+                    tooltip: 'Editar Cores',
+                    onPressed: () {
+                      if (isMobile) {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeBuilderModal()));
+                      } else {
+                        showDialog(
+                          context: context,
+                          builder: (context) => const ThemeBuilderModal(),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.palette, size: 20),
+                    color: themeData.colorScheme.primary,
+                  ),
+                ],
+              ],
             ),
-            if (isActive) ...[
-              IconButton(
-                tooltip: 'Editar Cores',
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => const ThemeBuilderModal(),
-                  );
-                },
-                icon: const Icon(Icons.palette, size: 20),
-                color: themeData.colorScheme.primary,
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }
@@ -440,6 +547,7 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
   Widget _buildThemeOption(AppThemeType type, AppThemeType currentType) {
     final isActive = type == currentType;
     final themeData = AppTheme.resolve(type);
+    final isMobile = MediaQuery.of(context).size.width < 600;
     
     return InkWell(
       onTap: () {
@@ -447,8 +555,8 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: 320, // Largura reduzida para caber no Grid
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        width: isMobile ? (MediaQuery.of(context).size.width - 60) / 3 : 320,
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 16, vertical: 12),
         decoration: BoxDecoration(
           color: themeData.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
@@ -464,45 +572,67 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
             )
           ] : [],
         ),
-        child: Row(
-          children: [
-            _buildColorPalette(themeData),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Text(
-                type.label,
-                style: TextStyle(
-                  color: themeData.colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+        child: isMobile 
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildColorPalette(themeData, compact: true),
+                const SizedBox(height: 8),
+                Text(
+                  type.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: themeData.colorScheme.onSurface,
+                    fontSize: 11,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  ),
                 ),
-              ),
+                if (isActive) ...[
+                  const SizedBox(height: 6),
+                  Icon(Icons.check_circle, size: 16, color: themeData.colorScheme.primary),
+                ],
+              ],
+            )
+          : Row(
+              children: [
+                _buildColorPalette(themeData),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Text(
+                    type.label,
+                    style: TextStyle(
+                      color: themeData.colorScheme.onSurface,
+                      fontSize: 16,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (isActive)
+                  Icon(Icons.check_circle, color: themeData.colorScheme.primary),
+              ],
             ),
-            if (isActive)
-              Icon(Icons.check_circle, color: themeData.colorScheme.primary),
-          ],
-        ),
       ),
     );
   }
 
-  Widget _buildColorPalette(ThemeData theme) {
+  Widget _buildColorPalette(ThemeData theme, {bool compact = false}) {
+    final double size = compact ? 20.0 : 28.0;
     return SizedBox(
-      width: 60,
-      height: 28,
+      width: compact ? 44 : 60,
+      height: size,
       child: Stack(
         children: [
           Positioned(
             left: 0,
-            child: _buildColorCircle(theme.colorScheme.primary, 28, zIndex: 1),
+            child: _buildColorCircle(theme.colorScheme.primary, size, zIndex: 1),
           ),
           Positioned(
-            left: 16,
-            child: _buildColorCircle(theme.colorScheme.surfaceContainerHighest, 28, zIndex: 2),
+            left: compact ? 12 : 16,
+            child: _buildColorCircle(theme.colorScheme.surfaceContainerHighest, size, zIndex: 2),
           ),
           Positioned(
-            left: 32,
-            child: _buildColorCircle(theme.colorScheme.onSurface, 28, zIndex: 3),
+            left: compact ? 24 : 32,
+            child: _buildColorCircle(theme.colorScheme.onSurface, size, zIndex: 3),
           ),
         ],
       ),
@@ -532,9 +662,10 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     final colors = Theme.of(context).colorScheme;
     final user = ref.watch(authStateProvider).value;
     final displayName = user?.displayName ?? user?.email?.split('@').first ?? 'Usuário';
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(32.0),
+      padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -554,7 +685,7 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
           
           // Card de Perfil Premium
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(isMobile ? 24 : 32),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -574,95 +705,211 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                 )
               ],
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colors.primary.withOpacity(0.3),
-                            blurRadius: 15,
-                            spreadRadius: 2,
-                          )
+            child: isMobile
+                ? Column(
+                    children: [
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colors.primary.withOpacity(0.3),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 42,
+                              backgroundColor: colors.primaryContainer,
+                              child: Text(
+                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Função de trocar foto em breve!')),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: colors.surfaceContainer, width: 2),
+                              ),
+                              child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
+                            ),
+                          ),
                         ],
                       ),
-                      child: CircleAvatar(
-                        radius: 42,
-                        backgroundColor: colors.primaryContainer,
-                        child: Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                          style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
+                      const SizedBox(height: 24),
+                      Column(
+                        children: [
+                          Text(
+                            displayName,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: colors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              user?.email ?? 'Sem e-mail vinculado',
+                              style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Função de alterar senha em breve!')),
+                            );
+                          },
+                          icon: const Icon(Icons.password, size: 18),
+                          label: const Text('Alterar Senha'),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
                         ),
                       ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Função de trocar foto em breve!')),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: colors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colors.surfaceContainer, width: 2),
-                        ),
-                        child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 32),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        displayName,
-                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          user?.email ?? 'Sem e-mail vinculado',
-                          style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () => ref.read(firebaseAuthProvider).signOut(),
+                          icon: const Icon(Icons.logout, size: 18),
+                          label: const Text('Sair da Conta'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.error.withOpacity(0.1),
+                            foregroundColor: colors.error,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
                         ),
                       ),
                     ],
-                  ),
-                ),
-                Column(
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Função de alterar senha em breve!')),
-                        );
-                      },
-                      icon: const Icon(Icons.password, size: 18),
-                      label: const Text('Alterar Senha'),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: colors.primary.withOpacity(0.3),
+                                  blurRadius: 15,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                            ),
+                            child: CircleAvatar(
+                              radius: 42,
+                              backgroundColor: colors.primaryContainer,
+                              child: Text(
+                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Função de trocar foto em breve!')),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: colors.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: colors.surfaceContainer, width: 2),
+                              ),
+                              child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                      const SizedBox(width: 32),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              displayName,
+                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: colors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                user?.email ?? 'Sem e-mail vinculado',
+                                style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Função de alterar senha em breve!')),
+                              );
+                            },
+                            icon: const Icon(Icons.password, size: 18),
+                            label: const Text('Alterar Senha'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: () => ref.read(firebaseAuthProvider).signOut(),
+                            icon: const Icon(Icons.logout, size: 18),
+                            label: const Text('Sair da Conta'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: colors.error.withOpacity(0.1),
+                              foregroundColor: colors.error,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
           ),
           
           const SizedBox(height: 48),
@@ -766,35 +1013,44 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
 
   Widget _buildDangerOption(String title, String description, String buttonText, IconData icon, VoidCallback onPressed, {bool isDestructive = false}) {
     final colors = Theme.of(context).colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 4),
+        Text(description, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
+      ],
+    );
+
+    final button = FilledButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(buttonText),
+      style: FilledButton.styleFrom(
+        backgroundColor: isDestructive ? Colors.red : colors.surfaceContainerHighest,
+        foregroundColor: isDestructive ? Colors.white : colors.onSurface,
+      ),
+    );
+
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          content,
+          const SizedBox(height: 16),
+          button,
+        ],
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                description,
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
+        Expanded(child: content),
         const SizedBox(width: 16),
-        FilledButton.icon(
-          onPressed: onPressed,
-          icon: Icon(icon, size: 18),
-          label: Text(buttonText),
-          style: FilledButton.styleFrom(
-            backgroundColor: isDestructive ? Colors.red : colors.surfaceContainerHighest,
-            foregroundColor: isDestructive ? Colors.white : colors.onSurface,
-          ),
-        ),
+        button,
       ],
     );
   }

@@ -12,10 +12,11 @@ class MidiSettingsPanel extends ConsumerWidget {
     final state = ref.watch(midiProvider);
     final notifier = ref.read(midiProvider.notifier);
     final colors = Theme.of(context).colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < 800;
 
     if (!state.isSupported) {
       return Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -29,20 +30,76 @@ class MidiSettingsPanel extends ConsumerWidget {
 
     final activeProfile = state.activeProfile;
 
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // TOP BAR
-          Row(
+    final topBar = isMobile
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.piano, color: colors.primary, size: 28),
+                  const SizedBox(width: 12),
+                  const Text('Controles MIDI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: state.activeOutputId != null ? () => notifier.triggerPanic() : null,
+                    icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                    label: const Text('Panic (Silenciar)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.orange.shade800,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: colors.surfaceContainerHighest,
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
+                            boxShadow: state.inputs.isNotEmpty ? [
+                              BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)
+                            ] : [],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          state.inputs.isNotEmpty ? 'Conectado' : 'Desconectado',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          )
+        : Row(
             children: [
               Icon(Icons.piano, color: colors.primary, size: 28),
               const SizedBox(width: 12),
               const Text('Controles MIDI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
               const Spacer(),
-              
-              // PANIC BUTTON
               FilledButton.icon(
                 onPressed: state.activeOutputId != null ? () => notifier.triggerPanic() : null,
                 icon: const Icon(Icons.warning_amber_rounded, size: 20),
@@ -54,8 +111,6 @@ class MidiSettingsPanel extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // STATUS INDICATOR
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -90,218 +145,230 @@ class MidiSettingsPanel extends ConsumerWidget {
                 ),
               ),
             ],
+          );
+
+    final leftColumn = Container(
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.settings_input_component, size: 20, color: colors.primary),
+              const SizedBox(width: 8),
+              Text('Dispositivos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colors.onSurface)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                tooltip: 'Recarregar Dispositivos',
+                onPressed: () {},
+              ),
+            ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
+          
+          Text('Dispositivo de Entrada (Input)', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
+          const SizedBox(height: 6),
+          _buildDropdown<String>(
+            value: state.activeInputId,
+            items: state.inputs.isEmpty
+                ? [const DropdownMenuItem(value: null, child: Text('Nenhum input'))]
+                : state.inputs.map((d) => DropdownMenuItem(value: d.id, child: Text(d.name))).toList(),
+            onChanged: (val) { if (val != null) notifier.setActiveInput(val); },
+            colors: colors,
+          ),
+          const SizedBox(height: 16),
+          
+          Text('Dispositivo de Saída (Output)', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
+          const SizedBox(height: 6),
+          _buildDropdown<String>(
+            value: state.activeOutputId,
+            items: state.outputs.isEmpty
+                ? [const DropdownMenuItem(value: null, child: Text('Nenhum output'))]
+                : state.outputs.map((d) => DropdownMenuItem(value: d.id, child: Text(d.name))).toList(),
+            onChanged: (val) { if (val != null) notifier.setActiveOutput(val); },
+            colors: colors,
+          ),
+          
+          const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider()),
+          
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sinal MIDI', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 100),
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: state.isReceivingSignal ? colors.primary : colors.surfaceContainerHighest,
+                      boxShadow: state.isReceivingSignal ? [
+                        BoxShadow(color: colors.primary.withOpacity(0.6), blurRadius: 8, spreadRadius: 2)
+                      ] : [],
+                      border: Border.all(color: state.isReceivingSignal ? colors.primary : colors.outline.withOpacity(0.3)),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Canal MIDI', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: isMobile ? 120 : 140,
+                    child: _buildDropdown<int>(
+                      value: state.activeChannel,
+                      items: [
+                        const DropdownMenuItem(value: 0, child: Text('Omni (Todos)')),
+                        ...List.generate(16, (i) => DropdownMenuItem(value: i + 1, child: Text('Canal ${i + 1}'))),
+                      ],
+                      onChanged: (val) { if (val != null) notifier.setActiveChannel(val); },
+                      colors: colors,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider()),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Perfil Ativo', style: TextStyle(fontWeight: FontWeight.w600, color: colors.primary)),
+              TextButton.icon(
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Novo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.primary,
+                  padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 4),
+                ),
+                onPressed: () => _showNewProfileDialog(context, ref),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildDropdown<String>(
+            value: state.activeProfileId,
+            items: state.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
+            onChanged: (val) { if (val != null) notifier.setActiveProfile(val); },
+            colors: colors,
+          ),
+        ],
+      ),
+    );
+
+    final rightColumn = Container(
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outline.withOpacity(0.1)),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Ações Mapeáveis', style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary, fontSize: 20)),
+              Text('Clique em MAPEAR e pressione o botão no seu controlador.', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
+              const SizedBox(height: 24),
+              
+              _buildSectionTitle('Navegação de Repertório', Icons.library_music, colors),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildMappingRow('Próxima Música', 'next_song', Icons.skip_next, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Música Anterior', 'prev_song', Icons.skip_previous, activeProfile, state, notifier, colors, isMobile),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle('Controle de Rolagem', Icons.swap_vert, colors),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildMappingRow('Iniciar/Pausar Rolagem', 'toggle_scroll', Icons.play_arrow, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Aumentar Velocidade', 'speed_up', Icons.fast_forward, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Diminuir Velocidade', 'speed_down', Icons.fast_rewind, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Página p/ Baixo', 'scroll_down', Icons.arrow_downward, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Página p/ Cima', 'scroll_up', Icons.arrow_upward, activeProfile, state, notifier, colors, isMobile),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle('Tonalidade (Transposição)', Icons.music_note, colors),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildMappingRow('Subir Tom (+)', 'tone_up', Icons.arrow_drop_up, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Descer Tom (-)', 'tone_down', Icons.arrow_drop_down, activeProfile, state, notifier, colors, isMobile),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              _buildSectionTitle('Performance & Mixer', Icons.tune, colors),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _buildMappingRow('Volume Geral', 'volume_master', Icons.volume_up, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Mute (Cortar Som)', 'mute_toggle', Icons.volume_off, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Trocar Timbre', 'patch_change', Icons.piano, activeProfile, state, notifier, colors, isMobile),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return Padding(
+      padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          topBar,
+          SizedBox(height: isMobile ? 16 : 32),
           
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // LEFT COLUMN (Configuration)
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colors.outline.withOpacity(0.2)),
-                    ),
+            child: isMobile
+                ? SingleChildScrollView(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.settings_input_component, size: 20, color: colors.primary),
-                            const SizedBox(width: 8),
-                            Text('Dispositivos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colors.onSurface)),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.refresh, size: 20),
-                              tooltip: 'Recarregar Dispositivos',
-                              onPressed: () {},
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Text('Dispositivo de Entrada (Input)', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
-                        const SizedBox(height: 6),
-                        _buildDropdown<String>(
-                          value: state.activeInputId,
-                          items: state.inputs.isEmpty
-                              ? [const DropdownMenuItem(value: null, child: Text('Nenhum input'))]
-                              : state.inputs.map((d) => DropdownMenuItem(value: d.id, child: Text(d.name))).toList(),
-                          onChanged: (val) { if (val != null) notifier.setActiveInput(val); },
-                          colors: colors,
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        Text('Dispositivo de Saída (Output)', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
-                        const SizedBox(height: 6),
-                        _buildDropdown<String>(
-                          value: state.activeOutputId,
-                          items: state.outputs.isEmpty
-                              ? [const DropdownMenuItem(value: null, child: Text('Nenhum output'))]
-                              : state.outputs.map((d) => DropdownMenuItem(value: d.id, child: Text(d.name))).toList(),
-                          onChanged: (val) { if (val != null) notifier.setActiveOutput(val); },
-                          colors: colors,
-                        ),
-                        
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider()),
-                        
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Sinal MIDI', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
-                                const SizedBox(height: 6),
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 100),
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: state.isReceivingSignal ? colors.primary : colors.surfaceContainerHighest,
-                                    boxShadow: state.isReceivingSignal ? [
-                                      BoxShadow(color: colors.primary.withOpacity(0.6), blurRadius: 8, spreadRadius: 2)
-                                    ] : [],
-                                    border: Border.all(color: state.isReceivingSignal ? colors.primary : colors.outline.withOpacity(0.3)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Canal MIDI', style: TextStyle(fontWeight: FontWeight.w600, color: colors.onSurfaceVariant, fontSize: 13)),
-                                const SizedBox(height: 6),
-                                SizedBox(
-                                  width: 140,
-                                  child: _buildDropdown<int>(
-                                    value: state.activeChannel,
-                                    items: [
-                                      const DropdownMenuItem(value: 0, child: Text('Omni (Todos)')),
-                                      ...List.generate(16, (i) => DropdownMenuItem(value: i + 1, child: Text('Canal ${i + 1}'))),
-                                    ],
-                                    onChanged: (val) { if (val != null) notifier.setActiveChannel(val); },
-                                    colors: colors,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider()),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('Perfil Ativo', style: TextStyle(fontWeight: FontWeight.w600, color: colors.primary)),
-                            TextButton.icon(
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Novo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                              style: TextButton.styleFrom(
-                                foregroundColor: colors.primary,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              ),
-                              onPressed: () => _showNewProfileDialog(context, ref),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _buildDropdown<String>(
-                          value: state.activeProfileId,
-                          items: state.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
-                          onChanged: (val) { if (val != null) notifier.setActiveProfile(val); },
-                          colors: colors,
-                        ),
+                        leftColumn,
+                        const SizedBox(height: 24),
+                        rightColumn,
                       ],
                     ),
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 4, child: leftColumn),
+                      const SizedBox(width: 32),
+                      Expanded(flex: 6, child: rightColumn),
+                    ],
                   ),
-                ),
-                
-                const SizedBox(width: 32),
-                
-                // RIGHT COLUMN (Mappings List)
-                Expanded(
-                  flex: 6,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colors.outline.withOpacity(0.1)),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('Ações Mapeáveis', style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary, fontSize: 20)),
-                            Text('Clique em MAPEAR e pressione o botão no seu controlador.', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
-                            const SizedBox(height: 24),
-                            
-                            _buildSectionTitle('Navegação de Repertório', Icons.library_music, colors),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildMappingRow('Próxima Música', 'next_song', Icons.skip_next, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Música Anterior', 'prev_song', Icons.skip_previous, activeProfile, state, notifier, colors),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-        
-                            _buildSectionTitle('Controle de Rolagem', Icons.swap_vert, colors),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildMappingRow('Iniciar/Pausar Rolagem', 'toggle_scroll', Icons.play_arrow, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Aumentar Velocidade', 'speed_up', Icons.fast_forward, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Diminuir Velocidade', 'speed_down', Icons.fast_rewind, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Página p/ Baixo', 'scroll_down', Icons.arrow_downward, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Página p/ Cima', 'scroll_up', Icons.arrow_upward, activeProfile, state, notifier, colors),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-        
-                            _buildSectionTitle('Tonalidade (Transposição)', Icons.music_note, colors),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildMappingRow('Subir Tom (+)', 'tone_up', Icons.arrow_drop_up, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Descer Tom (-)', 'tone_down', Icons.arrow_drop_down, activeProfile, state, notifier, colors),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-
-                            _buildSectionTitle('Performance & Mixer', Icons.tune, colors),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: [
-                                _buildMappingRow('Volume Geral', 'volume_master', Icons.volume_up, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Mute (Cortar Som)', 'mute_toggle', Icons.volume_off, activeProfile, state, notifier, colors),
-                                _buildMappingRow('Trocar Timbre', 'patch_change', Icons.piano, activeProfile, state, notifier, colors),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -377,6 +444,7 @@ class MidiSettingsPanel extends ConsumerWidget {
     MidiState state,
     MidiNotifier notifier,
     ColorScheme colors,
+    bool isMobile,
   ) {
     final mapping = activeProfile.mappings[actionKey];
     final isLearningThis = state.isLearning && state.learningAction == actionKey;
@@ -389,7 +457,7 @@ class MidiSettingsPanel extends ConsumerWidget {
     }
 
     return Container(
-      width: 280,
+      width: isMobile ? double.infinity : 280,
       decoration: BoxDecoration(
         color: isLearningThis ? colors.primaryContainer.withOpacity(0.3) : colors.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
