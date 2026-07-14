@@ -26,7 +26,7 @@ class AppSettings {
   final String? fontFamily;
 
   const AppSettings({
-    this.defaultFontSize = 24.0, // Tamanho padrão razoável (Médio/Grande)
+    this.defaultFontSize = 14.0, // Tamanho padrão razoável (Médio/Grande)
     this.customThemeColorHex,
     this.customBgColorHex,
     this.customTextColorHex,
@@ -63,7 +63,7 @@ class SettingsNotifier extends Notifier<AppSettings> {
   AppSettings build() {
     _prefs = ref.watch(sharedPreferencesProvider);
     return AppSettings(
-      defaultFontSize: _prefs.getDouble(_kFontSizeKey) ?? 24.0,
+      defaultFontSize: _prefs.getDouble(_kFontSizeKey) ?? 14.0,
       customThemeColorHex: _prefs.getString(_kCustomThemeColorKey),
       customBgColorHex: _prefs.getString(_kCustomBgColorKey),
       customTextColorHex: _prefs.getString(_kCustomTextColorKey),

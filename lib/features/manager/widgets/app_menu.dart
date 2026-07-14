@@ -57,6 +57,8 @@ class _AppMenuState extends ConsumerState<AppMenu> {
 
   Widget _buildTopMenu(ColorScheme colors) {
     final activeTab = ref.watch(sidebarTabProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isCompact = screenWidth < 900;
     
     return Container(
       height: 64, // Altura padrão para top navbars
@@ -99,31 +101,50 @@ class _AppMenuState extends ConsumerState<AppMenu> {
           
           // Navigation Items (Center)
           Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ..._navItems.map((item) => _buildTopMenuItem(item, colors, activeTab)),
-                const SizedBox(width: 16),
-                _buildTopMenuItem(const MenuItemData(icon: Icons.settings, title: 'Configurações', tab: SidebarTab.settings), colors, activeTab),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ..._navItems.map((item) => _buildTopMenuItem(item, colors, activeTab, isCompact)),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 
           // Actions Section (Right)
           Row(
             children: [
-              FilledButton.icon(
-                onPressed: widget.onAddSong,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Música'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.primary.withOpacity(0.15),
-                  foregroundColor: colors.primary,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              if (isCompact)
+                IconButton.filled(
+                  onPressed: widget.onAddSong,
+                  icon: const Icon(Icons.add, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: colors.primary.withOpacity(0.15),
+                    foregroundColor: colors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: widget.onAddSong,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Música'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.primary.withOpacity(0.15),
+                    foregroundColor: colors.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
               const SizedBox(width: 24),
               _buildUserProfile(colors, isTop: true),
             ],
@@ -133,50 +154,73 @@ class _AppMenuState extends ConsumerState<AppMenu> {
     );
   }
 
-  Widget _buildTopMenuItem(MenuItemData item, ColorScheme colors, SidebarTab activeTab) {
+  Widget _buildTopMenuItem(MenuItemData item, ColorScheme colors, SidebarTab activeTab, bool isCompact) {
     final isActive = activeTab == item.tab;
     
+    final content = Container(
+      padding: EdgeInsets.symmetric(horizontal: isCompact ? 10 : 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isActive ? colors.primary.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(item.icon, size: 18, color: isActive ? colors.primary : colors.onSurfaceVariant),
+          if (!isCompact) ...[
+            const SizedBox(width: 8),
+            Text(
+              item.title,
+              style: TextStyle(
+                color: isActive ? colors.primary : colors.onSurfaceVariant,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: InkWell(
-        onTap: () {
-          ref.read(sidebarTabProvider.notifier).setTab(item.tab);
-          if (item.tab == SidebarTab.songs) {
-            ref.read(songFilterProvider.notifier).clear();
-          } else if (item.tab == SidebarTab.favorites) {
-            ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
-          }
-        },
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: isActive ? colors.primary.withOpacity(0.1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(item.icon, size: 18, color: isActive ? colors.primary : colors.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Text(
-                item.title,
-                style: TextStyle(
-                  color: isActive ? colors.primary : colors.onSurfaceVariant,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
-                ),
+      child: isCompact 
+          ? Tooltip(
+              message: item.title,
+              child: InkWell(
+                onTap: () {
+                  ref.read(sidebarTabProvider.notifier).setTab(item.tab);
+                  if (item.tab == SidebarTab.songs) {
+                    ref.read(songFilterProvider.notifier).clear();
+                  } else if (item.tab == SidebarTab.favorites) {
+                    ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: content,
               ),
-            ],
-          ),
-        ),
-      ),
+            )
+          : InkWell(
+              onTap: () {
+                ref.read(sidebarTabProvider.notifier).setTab(item.tab);
+                if (item.tab == SidebarTab.songs) {
+                  ref.read(songFilterProvider.notifier).clear();
+                } else if (item.tab == SidebarTab.favorites) {
+                  ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: content,
+            ),
     );
   }
 
   Widget _buildSidebar(ColorScheme colors) {
     final activeTab = ref.watch(sidebarTabProvider);
-    final width = _collapseMainSidebar ? 72.0 : 240.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isForcedCollapsed = screenWidth < 900;
+    final isCollapsed = _collapseMainSidebar || isForcedCollapsed;
+    final width = isCollapsed ? 72.0 : 240.0;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -193,7 +237,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
               child: Row(
-                mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
+                mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
@@ -204,7 +248,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
                       fit: BoxFit.contain,
                     ),
                   ),
-                  if (!_collapseMainSidebar) ...[
+                  if (!isCollapsed) ...[
                     const SizedBox(width: 14),
                     RichText(
                       text: TextSpan(
@@ -227,11 +271,11 @@ class _AppMenuState extends ConsumerState<AppMenu> {
             // Perfil
             Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: _collapseMainSidebar ? 8.0 : 16.0,
+                horizontal: isCollapsed ? 8.0 : 16.0,
                 vertical: 12.0,
               ),
               child: Container(
-                padding: EdgeInsets.all(_collapseMainSidebar ? 6.0 : 12.0),
+                padding: EdgeInsets.all(isCollapsed ? 6.0 : 12.0),
                 decoration: BoxDecoration(
                   color: colors.onSurface.withOpacity(0.03),
                   borderRadius: BorderRadius.circular(12),
@@ -243,16 +287,16 @@ class _AppMenuState extends ConsumerState<AppMenu> {
             
             // Botão Adicionar
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 8.0 : 16.0, vertical: 8.0),
+              padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8.0 : 16.0, vertical: 8.0),
               child: OutlinedButton(
                 onPressed: widget.onAddSong,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 40),
                   foregroundColor: colors.primary,
                   side: BorderSide(color: colors.outline.withOpacity(0.5)),
-                  padding: _collapseMainSidebar ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16),
+                  padding: isCollapsed ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16),
                 ),
-                child: _collapseMainSidebar 
+                child: isCollapsed 
                     ? const Icon(Icons.add)
                     : const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -283,40 +327,41 @@ class _AppMenuState extends ConsumerState<AppMenu> {
                   _buildSidebarItem(const MenuItemData(icon: Icons.settings, title: 'Configurações', tab: SidebarTab.settings), colors, activeTab),
                   
                   // Collapse Toggle
-                  InkWell(
-                    onTap: () {
-                      setState(() {
-                        _collapseMainSidebar = !_collapseMainSidebar;
-                      });
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      height: 46,
-                      padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 0 : 14),
-                      child: Row(
-                        mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _collapseMainSidebar ? Icons.chevron_right : Icons.chevron_left,
-                            color: colors.onSurfaceVariant,
-                            size: 20,
-                          ),
-                          if (!_collapseMainSidebar) ...[
-                            const SizedBox(width: 12),
-                            Text(
-                              'Minimizar',
-                              style: TextStyle(
-                                color: colors.onSurfaceVariant,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
+                  if (!isForcedCollapsed)
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _collapseMainSidebar = !_collapseMainSidebar;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        height: 46,
+                        padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 0 : 14),
+                        child: Row(
+                          mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isCollapsed ? Icons.chevron_right : Icons.chevron_left,
+                              color: colors.onSurfaceVariant,
+                              size: 20,
                             ),
+                            if (!isCollapsed) ...[
+                              const SizedBox(width: 12),
+                              Text(
+                                'Minimizar',
+                                style: TextStyle(
+                                  color: colors.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -328,6 +373,10 @@ class _AppMenuState extends ConsumerState<AppMenu> {
 
   Widget _buildSidebarItem(MenuItemData item, ColorScheme colors, SidebarTab activeTab) {
     final isActive = activeTab == item.tab;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isForcedCollapsed = screenWidth < 900;
+    final isCollapsed = _collapseMainSidebar || isForcedCollapsed;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: InkWell(
@@ -343,18 +392,18 @@ class _AppMenuState extends ConsumerState<AppMenu> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           height: 46,
-          padding: EdgeInsets.symmetric(horizontal: _collapseMainSidebar ? 0 : 14),
+          padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 0 : 14),
           decoration: BoxDecoration(
             color: isActive ? colors.primary.withOpacity(0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
-            border: isActive && !_collapseMainSidebar ? Border.all(color: colors.primary.withOpacity(0.35), width: 1) : null,
+            border: isActive && !isCollapsed ? Border.all(color: colors.primary.withOpacity(0.35), width: 1) : null,
           ),
           child: Row(
-            mainAxisAlignment: _collapseMainSidebar ? MainAxisAlignment.center : MainAxisAlignment.start,
+            mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(item.icon, size: 20, color: isActive ? colors.primary : colors.onSurfaceVariant),
-              if (!_collapseMainSidebar) ...[
+              if (!isCollapsed) ...[
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -381,9 +430,42 @@ class _AppMenuState extends ConsumerState<AppMenu> {
     final displayName = user?.displayName ?? 'User';
     final email = user?.email ?? '';
 
-    final avatar = InkWell(
-      onTap: widget.onLogout,
-      borderRadius: BorderRadius.circular(20),
+    final avatar = PopupMenuButton<int>(
+      tooltip: 'Menu do Usuário',
+      offset: const Offset(0, 48),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: colors.surface,
+      elevation: 8,
+      onSelected: (value) {
+        if (value == 0) {
+          ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.settings);
+        } else if (value == 1) {
+          widget.onLogout();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 0,
+          child: Row(
+            children: [
+              Icon(Icons.settings, size: 20, color: colors.onSurface),
+              const SizedBox(width: 12),
+              Text('Configurações', style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 1,
+          child: Row(
+            children: [
+              const Icon(Icons.logout, size: 20, color: Colors.redAccent),
+              const SizedBox(width: 12),
+              const Text('Sair', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ],
       child: Container(
         width: 36,
         height: 36,
@@ -398,7 +480,11 @@ class _AppMenuState extends ConsumerState<AppMenu> {
       ),
     );
 
-    if (isTop || _collapseMainSidebar) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isForcedCollapsed = screenWidth < 900;
+    final isCollapsed = _collapseMainSidebar || isForcedCollapsed;
+
+    if (isTop || isCollapsed) {
       return avatar;
     }
 

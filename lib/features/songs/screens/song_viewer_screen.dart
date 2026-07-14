@@ -7,8 +7,10 @@ import 'dart:ui_web' as ui_web;
 import '../models/song.dart';
 
 import '../widgets/chord_api_viewer.dart';
+import '../widgets/circular_chord_wheel.dart';
 import '../utils/chord_pro_parser.dart';
 import '../utils/chord_transposer.dart';
+import '../utils/harmonic_field_calculator.dart';
 import '../../manager/providers/editor_provider.dart';
 import '../repositories/song_repository.dart';
 import '../../midi/providers/midi_providers.dart';
@@ -17,6 +19,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 enum VideoDisplayState { full, mini, hidden }
+enum SongViewMode { lyrics, roadmap, harmonic }
 
 class SongViewerScreen extends ConsumerStatefulWidget {
   final String chordProText;
@@ -49,7 +52,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   double _scrollSpeed = 1.0;
   bool _isAutoScrolling = false;
   bool _showChordsPanel = false;
-  bool _isRoadmapMode = true;
+  SongViewMode _viewMode = SongViewMode.roadmap;
   bool _isMultiColumn = false;
   late bool _isFavoriteLocal;
 
@@ -459,18 +462,32 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             ],
           ),
           actions: [
-            // View Mode Toggle
+            // View Mode Toggle (3 in 1)
             IconButton(
               icon: Icon(
-                _isRoadmapMode ? Icons.notes : Icons.grid_view,
-                color: _isRoadmapMode ? colors.primary : colors.onSurfaceVariant,
+                _viewMode == SongViewMode.harmonic 
+                    ? Icons.donut_large 
+                    : _viewMode == SongViewMode.roadmap 
+                        ? Icons.grid_view 
+                        : Icons.notes,
+                color: colors.primary,
               ),
               onPressed: () {
                 setState(() {
-                  _isRoadmapMode = !_isRoadmapMode;
+                  if (_viewMode == SongViewMode.lyrics) {
+                    _viewMode = SongViewMode.roadmap;
+                  } else if (_viewMode == SongViewMode.roadmap) {
+                    _viewMode = SongViewMode.harmonic;
+                  } else {
+                    _viewMode = SongViewMode.lyrics;
+                  }
                 });
               },
-              tooltip: _isRoadmapMode ? 'Ver Cifra Completa' : 'Ver Mapa do Arranjo',
+              tooltip: _viewMode == SongViewMode.lyrics 
+                  ? 'Ver Mapa do Arranjo' 
+                  : _viewMode == SongViewMode.roadmap 
+                      ? 'Ver Roda de Acordes' 
+                      : 'Ver Cifra Completa',
             ),
             // Favorite toggle
             if (widget.onFavoriteToggle != null)
@@ -522,7 +539,9 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   AnimatedBuilder(
                     animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
                     builder: (context, _) {
-                      final child = _isRoadmapMode
+                      final child = _viewMode == SongViewMode.harmonic
+                          ? _buildHarmonicFieldContent()
+                          : _viewMode == SongViewMode.roadmap
                           ? _buildRoadmapContent()
                           : SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
@@ -552,127 +571,187 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         ),
         bottomNavigationBar: _isFabPinned ? _buildPinnedBottomBar(colors) : null,
         floatingActionButton: _isFabPinned ? null : IgnorePointer(
-          ignoring: !_showFab,
+          ignoring: !_showFab || _isAutoScrolling,
           child: AnimatedOpacity(
-            opacity: _showFab ? 1.0 : 0.0,
+            opacity: (_showFab && !_isAutoScrolling) ? 1.0 : 0.0,
             duration: const Duration(milliseconds: 300),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Compact Font Size Control Tile
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainer,
-                    border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.hardEdge,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text('TEXTO', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () {
-                                  _startFabTimer();
-                                  _changeFontSize(-2);
-                                },
-                                child: Center(
-                                  child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
-                                ),
-                              ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildFloatingTile(Icons.auto_fix_high, 'Editar', () {
+                      ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
+                    }, colors, isActive: ref.watch(isEditorVisibleProvider)),
+                    _buildFloatingTile(Icons.unfold_more, 'Rolagem', _toggleAutoScroll, colors, isActive: _isAutoScrolling),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainer,
+                          border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
-                            VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                          ],
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text('TEXTO', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
                             Expanded(
-                              child: InkWell(
-                                onTap: () {
-                                  _startFabTimer();
-                                  _changeFontSize(2);
-                                },
-                                child: Center(
-                                  child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        _startFabTimer();
+                                        _changeFontSize(-2);
+                                      },
+                                      child: Center(
+                                        child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
+                                      ),
+                                    ),
+                                  ),
+                                  VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        _startFabTimer();
+                                        _changeFontSize(2);
+                                      },
+                                      child: Center(
+                                        child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Compact Transpose Control Tile
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainer,
-                    border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.hardEdge,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text('TOM', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: InkWell(
-                                onTap: () {
-                                  _startFabTimer();
-                                  _changeTranspose(-1);
-                                },
-                                child: Center(
-                                  child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
-                                ),
-                              ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainer,
+                          border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
-                            VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                          ],
+                        ),
+                        clipBehavior: Clip.hardEdge,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text('TOM', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
                             Expanded(
-                              child: InkWell(
-                                onTap: () {
-                                  _startFabTimer();
-                                  _changeTranspose(1);
-                                },
-                                child: Center(
-                                  child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
-                                ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        _startFabTimer();
+                                        _changeTranspose(-1);
+                                      },
+                                      child: Center(
+                                        child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
+                                      ),
+                                    ),
+                                  ),
+                                  VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        _startFabTimer();
+                                        _changeTranspose(1);
+                                      },
+                                      child: Center(
+                                        child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    _buildFloatingTile(Icons.music_note, 'Acordes', () {
+                      setState(() {
+                        _showChordsPanel = !_showChordsPanel;
+                      });
+                    }, colors, isActive: _showChordsPanel),
+                    if (_parsedSong.video.isNotEmpty)
+                      _buildFloatingTile(
+                        _videoState == VideoDisplayState.full
+                            ? Icons.ondemand_video
+                            : _videoState == VideoDisplayState.mini
+                                ? Icons.audio_file
+                                : Icons.videocam_off,
+                        _videoState == VideoDisplayState.full
+                            ? 'Vídeo'
+                            : _videoState == VideoDisplayState.mini
+                                ? 'Mini'
+                                : 'Oculto',
+                        () {
+                          setState(() {
+                            _videoState = _videoState == VideoDisplayState.full
+                                ? VideoDisplayState.mini
+                                : _videoState == VideoDisplayState.mini
+                                    ? VideoDisplayState.hidden
+                                    : VideoDisplayState.full;
+                          });
+                        },
+                        colors,
+                        isActive: _videoState != VideoDisplayState.hidden,
+                      ),
+                    if (widget.onFavoriteToggle != null)
+                      _buildFloatingTile(
+                        _isFavoriteLocal ? Icons.favorite : Icons.favorite_border,
+                        'Favorito',
+                        () {
+                          setState(() {
+                            HapticFeedback.lightImpact();
+                            _isFavoriteLocal = !_isFavoriteLocal;
+                          });
+                          widget.onFavoriteToggle!();
+                        },
+                        colors,
+                        isActive: _isFavoriteLocal,
+                      ),
+                    _buildFloatingTile(Icons.view_column, 'Colunas', () {
+                      setState(() {
+                        _isMultiColumn = !_isMultiColumn;
+                      });
+                    }, colors, isActive: _isMultiColumn),
+                    _buildFloatingTile(Icons.playlist_add, 'Lista', _showAddToCollectionDialog, colors),
+                    _buildFloatingTile(Icons.menu_book, 'Dicionário', _showChordsDictionaryDialog, colors),
+                    _buildFloatingTile(Icons.push_pin_outlined, 'Fixar', _toggleFabPin, colors),
+                  ],
                 ),
-                _buildFloatingTile(Icons.unfold_more, 'Rolagem', _toggleAutoScroll, colors),
-                _buildFloatingTile(Icons.menu_book, 'Dicionário', _showChordsDictionaryDialog, colors),
-                _buildFloatingTile(Icons.push_pin_outlined, 'Fixar', _toggleFabPin, colors),
-              ],
+              ),
             ),
           ),
         ),
@@ -717,7 +796,9 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                         AnimatedBuilder(
                                           animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
                                           builder: (context, _) {
-                                            final child = _isRoadmapMode
+                                            final child = _viewMode == SongViewMode.harmonic
+                                                ? _buildHarmonicFieldContent()
+                                                : _viewMode == SongViewMode.roadmap
                                                 ? _buildRoadmapContent()
                                                 : SingleChildScrollView(
                                                     scrollDirection: Axis.horizontal,
@@ -876,6 +957,32 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   label: 'Rolagem',
                   onTap: _toggleAutoScroll,
                   isActive: _isAutoScrolling,
+                ),
+                
+                // View Mode Toggle (3 in 1)
+                _buildSidebarTile(
+                  icon: _viewMode == SongViewMode.harmonic 
+                      ? Icons.donut_large 
+                      : _viewMode == SongViewMode.roadmap 
+                          ? Icons.grid_view 
+                          : Icons.notes,
+                  label: _viewMode == SongViewMode.harmonic 
+                      ? 'Roda' 
+                      : _viewMode == SongViewMode.roadmap 
+                          ? 'Mapa' 
+                          : 'Cifra',
+                  onTap: () {
+                    setState(() {
+                      if (_viewMode == SongViewMode.lyrics) {
+                        _viewMode = SongViewMode.roadmap;
+                      } else if (_viewMode == SongViewMode.roadmap) {
+                        _viewMode = SongViewMode.harmonic;
+                      } else {
+                        _viewMode = SongViewMode.lyrics;
+                      }
+                    });
+                  },
+                  isActive: _viewMode != SongViewMode.lyrics, // Highlight if not in default mode
                 ),
                 
                 // Compact Font Size Control Tile
@@ -2153,6 +2260,112 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     } else {
       return const Color(0xFF1E3A8A); // Dark Blue
     }
+  }
+
+  Widget _buildHarmonicFieldContent() {
+    final colors = Theme.of(context).colorScheme;
+    final currentKey = _parsedSong.key == 'Detectar' || _parsedSong.key.isEmpty 
+        ? 'C' 
+        : ChordTransposer.transpose(_parsedSong.key, _transposeSteps.value);
+    
+    final harmonicField = HarmonicFieldCalculator.getField(currentKey);
+    
+    if (harmonicField == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Text('Não foi possível calcular o campo harmônico para o tom $currentKey.', 
+              style: TextStyle(color: colors.onSurfaceVariant)),
+        ),
+      );
+    }
+
+    final Set<String> usedChords = {};
+    for (var line in _parsedSong.lines) {
+      for (var chord in line.chords) {
+        usedChords.add(ChordTransposer.transpose(chord.chord, _transposeSteps.value));
+      }
+    }
+
+    final Set<String> usedRoots = usedChords.map((c) => HarmonicFieldCalculator.extractRootChord(c)).toSet();
+    final diatonicRoots = harmonicField.diatonicChords.map((c) => HarmonicFieldCalculator.extractRootChord(c)).toSet();
+
+    final Set<String> extraChords = usedChords.where((c) {
+      final root = HarmonicFieldCalculator.extractRootChord(c);
+      return !diatonicRoots.contains(root);
+    }).toSet();
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text('Tom Atual: $currentKey', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: colors.onSurface)),
+            const SizedBox(height: 8),
+            Text('Os acordes em destaque são usados nesta música', style: TextStyle(color: colors.onSurfaceVariant)),
+            const SizedBox(height: 48),
+            
+            // Render the True Circular Wheel
+            CircularChordWheel(
+              currentKey: currentKey,
+              usedChords: usedChords,
+            ),
+            
+            const SizedBox(height: 64),
+            
+            if (extraChords.isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colors.outline.withOpacity(0.15)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.auto_awesome, color: colors.tertiary, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Acordes Extras', style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: colors.onSurface
+                        )),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('Empréstimos ou preparações fora do tom natural', style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.center,
+                      children: extraChords.map((c) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: colors.tertiary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colors.tertiary.withOpacity(0.5)),
+                        ),
+                        child: Text(c, style: TextStyle(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.bold,
+                          color: colors.tertiary,
+                        )),
+                      )).toList(),
+                    )
+                  ],
+                ),
+              ),
+            ]
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildLyricsContent() {

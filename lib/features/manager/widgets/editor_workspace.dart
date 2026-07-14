@@ -273,14 +273,12 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
   }
 
   Widget _buildToolbarButton(String label, String textToInsert) {
-    final colors = Theme.of(context).colorScheme;
-    return OutlinedButton(
+    return FilledButton.tonal(
       onPressed: () => _insertText(textToInsert),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        foregroundColor: colors.primary,
-        side: BorderSide(color: colors.primary.withOpacity(0.3)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        minimumSize: const Size(0, 36),
       ),
       child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
     );
@@ -523,8 +521,8 @@ E os acordes [G]entre colchetes
     
     // Ordena os repertórios colocando os mais recentes (criados por último) no topo
     final sortedSetlists = List<SongSetlist>.from(allSetlists).reversed.toList();
-    // Limita a exibição rápida no dropdown para os 10 mais recentes para não poluir a tela
-    final setlists = sortedSetlists.take(10).toList();
+    // Usa todos os repertórios para evitar crash no dropdown se a música estiver em um mais antigo
+    final setlists = sortedSetlists;
 
     final filter = ref.watch(songFilterProvider);
     final activeTab = ref.watch(sidebarTabProvider);
@@ -955,7 +953,7 @@ E os acordes [G]entre colchetes
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String?>(
-                        value: currentSavedSong?.folderId ?? _selectedFolderId,
+                        value: [currentSavedSong?.folderId ?? _selectedFolderId].where((id) => setlists.any((s) => s.id == id)).firstOrNull,
                         isExpanded: true,
                         dropdownColor: colors.surfaceContainerHigh,
                         style: const TextStyle(color: Colors.white, fontSize: 13),
@@ -1319,8 +1317,13 @@ E os acordes [G]entre colchetes
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  color: colors.surfaceContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHigh,
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+                    ],
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -1329,18 +1332,23 @@ E os acordes [G]entre colchetes
                           IconButton(
                             icon: const Icon(Icons.arrow_back, size: 20),
                             tooltip: 'Voltar para a Lista',
+                            style: IconButton.styleFrom(backgroundColor: colors.surfaceContainerHighest),
                             onPressed: () {
                               ref.read(isEditorVisibleProvider.notifier).state = false;
                             },
                           ),
-                          const SizedBox(width: 4),
-                          Text('EDITOR DE MÚSICA', style: Theme.of(context).textTheme.labelSmall),
+                          const SizedBox(width: 12),
+                          Text('Editor de Música', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      TextButton.icon(
+                      FilledButton.icon(
                         onPressed: _saveToFirebase,
                         icon: const Icon(Icons.cloud_upload, size: 16),
                         label: const Text('SALVAR NO DB'),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                        ),
                       ),
                     ],
                   ),
@@ -1361,8 +1369,10 @@ E os acordes [G]entre colchetes
                                 decoration: InputDecoration(
                                   labelText: 'Título da música',
                                   labelStyle: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
-                                  border: const OutlineInputBorder(),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  filled: true,
+                                  fillColor: colors.surfaceContainerHighest,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 ),
                               ),
                             ),
@@ -1371,11 +1381,13 @@ E os acordes [G]entre colchetes
                               child: TextField(
                                 controller: _artistController,
                                 style: const TextStyle(fontSize: 16, color: Colors.white),
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Artista / Cantor',
-                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  labelStyle: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+                                  filled: true,
+                                  fillColor: colors.surfaceContainerHighest,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 ),
                               ),
                             ),
@@ -1393,8 +1405,10 @@ E os acordes [G]entre colchetes
                                 decoration: InputDecoration(
                                   labelText: 'URL do Vídeo (YouTube)',
                                   labelStyle: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
-                                  border: const OutlineInputBorder(),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  filled: true,
+                                  fillColor: colors.surfaceContainerHighest,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 ),
                               ),
                             ),
@@ -1402,15 +1416,17 @@ E os acordes [G]entre colchetes
                             Expanded(
                               flex: 2,
                               child: InputDecorator(
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Repertório / Coleção',
-                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  labelStyle: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+                                  filled: true,
+                                  fillColor: colors.surfaceContainerHighest,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String?>(
-                                    value: currentSavedSong?.folderId ?? _selectedFolderId,
+                                    value: [currentSavedSong?.folderId ?? _selectedFolderId].where((id) => setlists.any((s) => s.id == id)).firstOrNull,
                                     isExpanded: true,
                                     dropdownColor: colors.surfaceContainerHigh,
                                     style: TextStyle(color: colors.onSurface, fontSize: 14),
@@ -1439,11 +1455,13 @@ E os acordes [G]entre colchetes
                             Expanded(
                               flex: 1,
                               child: InputDecorator(
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'Tom Original',
-                                  labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
-                                  border: OutlineInputBorder(),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  labelStyle: TextStyle(color: colors.onSurfaceVariant, fontSize: 13),
+                                  filled: true,
+                                  fillColor: colors.surfaceContainerHighest,
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
@@ -1530,11 +1548,13 @@ E os acordes [G]entre colchetes
                         Expanded(
                           child: Container(
                             decoration: BoxDecoration(
-                              border: Border.all(color: colors.outline.withOpacity(0.2)),
-                              color: colors.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(8),
+                              color: colors.surfaceContainerLowest,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+                              ],
                             ),
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(24),
                             child: TextField(
                               controller: _contentController,
                               maxLines: null,
