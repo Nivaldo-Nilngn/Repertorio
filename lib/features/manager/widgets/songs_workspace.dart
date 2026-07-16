@@ -540,6 +540,12 @@ E os acordes [G]entre colchetes
     final activeTab = ref.watch(sidebarTabProvider);
 
     final filteredSongs = savedSongs.where((song) {
+      if (_searchQuery.isNotEmpty) {
+        final matchesTitle = song.title.toLowerCase().contains(_searchQuery);
+        final matchesArtist = song.artist.toLowerCase().contains(_searchQuery);
+        return matchesTitle || matchesArtist;
+      }
+
       if (activeTab == SidebarTab.favorites || filter.onlyFavorites) {
         if (!song.isFavorite) return false;
       }
@@ -557,15 +563,10 @@ E os acordes [G]entre colchetes
       if (filter.artist != null) {
         if (song.artist.trim().toLowerCase() != filter.artist!.trim().toLowerCase()) return false;
       }
-      if (_searchQuery.isNotEmpty) {
-        final matchesTitle = song.title.toLowerCase().contains(_searchQuery);
-        final matchesArtist = song.artist.toLowerCase().contains(_searchQuery);
-        if (!matchesTitle && !matchesArtist) return false;
-      }
       return true;
     }).toList();
 
-    if (filter.folderId != null) {
+    if (filter.folderId != null && _searchQuery.isEmpty) {
       final matchingSetlist = setlists.where((s) => s.id == filter.folderId).firstOrNull;
       if (matchingSetlist != null) {
         filteredSongs.sort((a, b) {
@@ -749,8 +750,20 @@ E os acordes [G]entre colchetes
                       hintText: 'Pesquisar música...',
                       hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
                       border: InputBorder.none,
-                      icon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                      prefixIcon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                      prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      suffixIcon: _searchQuery.isNotEmpty 
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 16),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            )
+                          : null,
                       isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
                 ),
@@ -1242,8 +1255,20 @@ E os acordes [G]entre colchetes
                             hintText: 'Pesquisar música...',
                             hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
                             border: InputBorder.none,
-                            icon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                            prefixIcon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            suffixIcon: _searchQuery.isNotEmpty 
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 16),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                    },
+                                  )
+                                : null,
                             isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                       ),
