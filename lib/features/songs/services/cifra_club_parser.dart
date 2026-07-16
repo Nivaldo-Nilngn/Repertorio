@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
+import 'package:musicifras/features/songs/utils/chord_transposer.dart';
 
 class CifraClubParser {
   // Troque pela URL do seu worker após o deploy (ex: https://cifra-proxy.SEU_SUBDOMINIO.workers.dev)
@@ -12,20 +13,29 @@ class CifraClubParser {
       throw Exception('A URL informada não pertence ao Cifra Club. Por favor, cole um link válido.');
     }
 
+    int? targetKeyIndex;
+    final uri = Uri.parse(url);
+    if (uri.fragment.isNotEmpty) {
+      final fragmentParams = Uri.splitQueryString(uri.fragment);
+      if (fragmentParams.containsKey('key')) {
+        targetKeyIndex = int.tryParse(fragmentParams['key']!);
+      }
+    }
+
     final proxyUrl = '$_proxyBaseUrl?url=' + Uri.encodeComponent(url);
     try {
       final response = await http.get(Uri.parse(proxyUrl));
       if (response.statusCode == 200) {
         final htmlContent = response.body;
-        return parseHtmlToChordPro(htmlContent);
+        return parseHtmlToChordPro(htmlContent, targetKeyIndex: targetKeyIndex);
       }
       throw Exception('Failed to fetch page');
     } catch (e) {
-      throw Exception('Error parsing Cifra Club: \$e');
+      throw Exception('Error parsing Cifra Club: $e');
     }
   }
 
-  static String parseHtmlToChordPro(String htmlContent) {
+  static String parseHtmlToChordPro(String htmlContent, {int? targetKeyIndex}) {
     final document = html_parser.parse(htmlContent);
 
     // Extract Metadata
@@ -35,7 +45,38 @@ class CifraClubParser {
 
     final title = titleElement?.text.trim() ?? 'Unknown Title';
     final artist = artistElement?.text.trim() ?? 'Unknown Artist';
-    final key = keyElement?.text.trim() ?? 'C';
+    
+    String originalKeyStr = keyElement?.text.trim() ?? 'C';
+    final tomContent = document.querySelector('#cifra_tom')?.text ?? '';
+    final formaMatch = RegExp(r'forma dos acordes no tom de ([CDEFGAB][#b]?m?)', caseSensitive: false).firstMatch(tomContent);
+    if (formaMatch != null) {
+      originalKeyStr = formaMatch.group(1)!;
+    }
+
+    String finalKey = originalKeyStr;
+    int steps = 0;
+
+    if (targetKeyIndex != null) {
+      final notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      final notesAlt = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+      
+      final match = RegExp(r'^([CDEFGAB][#b]?)').firstMatch(originalKeyStr);
+      final rootFrom = match?.group(1) ?? originalKeyStr;
+      
+      int originalIndexInNotes = notes.indexOf(rootFrom);
+      if (originalIndexInNotes == -1) originalIndexInNotes = notesAlt.indexOf(rootFrom);
+
+      if (originalIndexInNotes != -1) {
+        int targetIndexInNotes = (targetKeyIndex + 9) % 12;
+        steps = targetIndexInNotes - originalIndexInNotes;
+        
+        final cifraclubKeys = ['A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab'];
+        finalKey = cifraclubKeys[targetKeyIndex % 12];
+        if (originalKeyStr.endsWith('m')) {
+          finalKey += 'm';
+        }
+      }
+    }
 
     String videoUrl = '';
     final iframe = document.querySelector('iframe[src*="youtube.com"]');
@@ -61,7 +102,7 @@ class CifraClubParser {
     final chordProLines = <String>[];
     chordProLines.add('{title: $title}');
     chordProLines.add('{artist: $artist}');
-    chordProLines.add('{key: $key}');
+    chordProLines.add('{key: $finalKey}');
     if (videoUrl.isNotEmpty) {
       chordProLines.add('{video: $videoUrl}');
     }
@@ -97,7 +138,16 @@ class CifraClubParser {
       }
     }
 
-    return chordProLines.join('\n');
+    String finalContent = chordProLines.join('\n');
+    if (steps != 0) {
+      final regex = RegExp(r'\[(.*?)\]');
+      finalContent = finalContent.replaceAllMapped(regex, (match) {
+        final chord = match.group(1)!;
+        return '[${ChordTransposer.transpose(chord, steps)}]';
+      });
+    }
+
+    return finalContent;
   }
 
   static String _stripHtmlTags(String html) {

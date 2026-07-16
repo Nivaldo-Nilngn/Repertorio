@@ -75,8 +75,10 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
   final TextEditingController _videoUrlController = TextEditingController();
   final TextEditingController _artistController = TextEditingController();
   final ChordProTextController _contentController = ChordProTextController();
+  final TextEditingController _searchController = TextEditingController();
   
   String _currentChordPro = '';
+  String _searchQuery = '';
   String _selectedKey = 'Detectar';
   String? _selectedFolderId;
   ChordFormat _format = ChordFormat.chordPro;
@@ -104,6 +106,11 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
     _videoUrlController.addListener(_onFieldChanged);
     _artistController.addListener(_onFieldChanged);
     _contentController.addListener(_onFieldChanged);
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.trim().toLowerCase();
+      });
+    });
   }
 
   void _parseChordProToFields(String chordPro) {
@@ -178,6 +185,7 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
     _videoUrlController.dispose();
     _artistController.dispose();
     _contentController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -549,8 +557,27 @@ E os acordes [G]entre colchetes
       if (filter.artist != null) {
         if (song.artist.trim().toLowerCase() != filter.artist!.trim().toLowerCase()) return false;
       }
+      if (_searchQuery.isNotEmpty) {
+        final matchesTitle = song.title.toLowerCase().contains(_searchQuery);
+        final matchesArtist = song.artist.toLowerCase().contains(_searchQuery);
+        if (!matchesTitle && !matchesArtist) return false;
+      }
       return true;
     }).toList();
+
+    if (filter.folderId != null) {
+      final matchingSetlist = setlists.where((s) => s.id == filter.folderId).firstOrNull;
+      if (matchingSetlist != null) {
+        filteredSongs.sort((a, b) {
+          final indexA = matchingSetlist.items.indexWhere((item) => item.type == 'song' && item.title.trim().toLowerCase() == a.title.trim().toLowerCase());
+          final indexB = matchingSetlist.items.indexWhere((item) => item.type == 'song' && item.title.trim().toLowerCase() == b.title.trim().toLowerCase());
+          
+          // Se não encontrar (por algum motivo improvável), mantém a ordem
+          if (indexA == -1 || indexB == -1) return 0;
+          return indexA.compareTo(indexB);
+        });
+      }
+    }
 
     final selectedSongId = ref.watch(selectedSongIdProvider);
     final isEditorVisible = ref.watch(isEditorVisibleProvider);
@@ -705,6 +732,27 @@ E os acordes [G]entre colchetes
                         ),
                       ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 36,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainer,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: colors.outline.withOpacity(0.3)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Pesquisar música...',
+                      hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
+                      border: InputBorder.none,
+                      icon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                      isDense: true,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -1179,6 +1227,27 @@ E os acordes [G]entre colchetes
                     ),
                     if (activeTab == SidebarTab.songs) ...[
                       const SizedBox(height: 12),
+                      Container(
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainer,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: colors.outline.withOpacity(0.3)),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          style: const TextStyle(fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Pesquisar música...',
+                            hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.7), fontSize: 13),
+                            border: InputBorder.none,
+                            icon: Icon(Icons.search, size: 16, color: colors.onSurfaceVariant),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(

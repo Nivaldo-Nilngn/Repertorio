@@ -462,33 +462,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             ],
           ),
           actions: [
-            // View Mode Toggle (3 in 1)
-            IconButton(
-              icon: Icon(
-                _viewMode == SongViewMode.harmonic 
-                    ? Icons.donut_large 
-                    : _viewMode == SongViewMode.roadmap 
-                        ? Icons.grid_view 
-                        : Icons.notes,
-                color: colors.primary,
-              ),
-              onPressed: () {
-                setState(() {
-                  if (_viewMode == SongViewMode.lyrics) {
-                    _viewMode = SongViewMode.roadmap;
-                  } else if (_viewMode == SongViewMode.roadmap) {
-                    _viewMode = SongViewMode.harmonic;
-                  } else {
-                    _viewMode = SongViewMode.lyrics;
-                  }
-                });
-              },
-              tooltip: _viewMode == SongViewMode.lyrics 
-                  ? 'Ver Mapa do Arranjo' 
-                  : _viewMode == SongViewMode.roadmap 
-                      ? 'Ver Roda de Acordes' 
-                      : 'Ver Cifra Completa',
-            ),
             // Favorite toggle
             if (widget.onFavoriteToggle != null)
               IconButton(
@@ -505,19 +478,13 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 },
                 tooltip: _isFavoriteLocal ? 'Remover dos favoritos' : 'Favoritar',
               ),
-            // Auto-scroll toggle
-            IconButton(
-              icon: Icon(
-                _isAutoScrolling ? Icons.pause_circle : Icons.play_circle_outline,
-                color: _isAutoScrolling ? colors.primary : colors.onSurfaceVariant,
-              ),
-              onPressed: _toggleAutoScroll,
-              tooltip: 'Auto rolagem',
-            ),
           ],
         ),
-        body: Stack(
-          children: [
+        body: Listener(
+          onPointerDown: (_) => _onScroll(),
+          onPointerMove: (_) => _onScroll(),
+          child: Stack(
+            children: [
             SingleChildScrollView(
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
@@ -569,6 +536,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               ),
           ],
         ),
+        ),
         bottomNavigationBar: _isFabPinned ? _buildPinnedBottomBar(colors) : null,
         floatingActionButton: _isFabPinned ? null : IgnorePointer(
           ignoring: !_showFab || _isAutoScrolling,
@@ -586,6 +554,31 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                       ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
                     }, colors, isActive: ref.watch(isEditorVisibleProvider)),
                     _buildFloatingTile(Icons.unfold_more, 'Rolagem', _toggleAutoScroll, colors, isActive: _isAutoScrolling),
+                    _buildFloatingTile(
+                      _viewMode == SongViewMode.harmonic 
+                          ? Icons.donut_large 
+                          : _viewMode == SongViewMode.roadmap 
+                              ? Icons.grid_view 
+                              : Icons.notes,
+                      _viewMode == SongViewMode.harmonic 
+                          ? 'Roda' 
+                          : _viewMode == SongViewMode.roadmap 
+                              ? 'Mapa' 
+                              : 'Cifra',
+                      () {
+                        setState(() {
+                          if (_viewMode == SongViewMode.lyrics) {
+                            _viewMode = SongViewMode.roadmap;
+                          } else if (_viewMode == SongViewMode.roadmap) {
+                            _viewMode = SongViewMode.harmonic;
+                          } else {
+                            _viewMode = SongViewMode.lyrics;
+                          }
+                        });
+                      },
+                      colors,
+                      isActive: _viewMode != SongViewMode.lyrics,
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: Container(
@@ -741,11 +734,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                         colors,
                         isActive: _isFavoriteLocal,
                       ),
-                    _buildFloatingTile(Icons.view_column, 'Colunas', () {
-                      setState(() {
-                        _isMultiColumn = !_isMultiColumn;
-                      });
-                    }, colors, isActive: _isMultiColumn),
+
                     _buildFloatingTile(Icons.playlist_add, 'Lista', _showAddToCollectionDialog, colors),
                     _buildFloatingTile(Icons.menu_book, 'Dicionário', _showChordsDictionaryDialog, colors),
                     _buildFloatingTile(Icons.push_pin_outlined, 'Fixar', _toggleFabPin, colors),
@@ -2179,15 +2168,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final blockWidth = (constraints.maxWidth - (8.0 * 4)) / 5;
-                    return Wrap(
-                      spacing: 8.0,
-                      runSpacing: 8.0,
-                      children: _buildMeasureCells(row.measures, colors, blockWidth),
-                    );
-                  },
+                child: Wrap(
+                  spacing: 8.0,
+                  runSpacing: 8.0,
+                  children: _buildMeasureCells(row.measures, colors),
                 ),
               ),
               if (row.repetition != null && !hideRowRepetition) ...[
@@ -2208,7 +2192,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
 
-  List<Widget> _buildMeasureCells(List<List<String>> measures, ColorScheme colors, double blockWidth) {
+  List<Widget> _buildMeasureCells(List<List<String>> measures, ColorScheme colors) {
     List<Widget> cells = [];
 
     for (int i = 0; i < measures.length; i++) {
@@ -2219,28 +2203,21 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
       cells.add(
         Container(
-          width: blockWidth,
-          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
-          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: colors.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: colors.outline.withOpacity(0.3)),
           ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.center,
-            child: Text(
-              transposedChords,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              softWrap: false,
-              style: TextStyle(
-                fontFamily: 'Consolas',
-                fontSize: _fontSize.value - 6.0,
-                fontWeight: FontWeight.bold,
-                color: _getChordColor(),
-              ),
+          child: Text(
+            transposedChords,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: _fontSize.value - 3.0,
+              fontWeight: FontWeight.bold,
+              color: _getChordColor(),
+              height: 1.0,
             ),
           ),
         ),
@@ -2269,7 +2246,34 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         : ChordTransposer.transpose(_parsedSong.key, _transposeSteps.value);
     
     final harmonicField = HarmonicFieldCalculator.getField(currentKey);
-    
+    final bool isMinor = currentKey.endsWith('m') && !currentKey.endsWith('dim');
+
+    String? getDegree(String rawChord) {
+      if (harmonicField == null) return null;
+      final root = HarmonicFieldCalculator.extractRootChord(rawChord);
+      
+      bool isEq(String diatonic) => HarmonicFieldCalculator.areEnharmonicallyEquivalent(root, diatonic);
+      
+      if (isMinor) {
+        if (isEq(harmonicField.vi)) return 'I';
+        if (isEq(harmonicField.vii)) return 'II';
+        if (isEq(harmonicField.i)) return 'III';
+        if (isEq(harmonicField.ii)) return 'IV';
+        if (isEq(harmonicField.iii)) return 'V';
+        if (isEq(harmonicField.iv)) return 'VI';
+        if (isEq(harmonicField.v)) return 'VII';
+      } else {
+        if (isEq(harmonicField.i)) return 'I';
+        if (isEq(harmonicField.ii)) return 'II';
+        if (isEq(harmonicField.iii)) return 'III';
+        if (isEq(harmonicField.iv)) return 'IV';
+        if (isEq(harmonicField.v)) return 'V';
+        if (isEq(harmonicField.vi)) return 'VI';
+        if (isEq(harmonicField.vii)) return 'VII';
+      }
+      return null;
+    }
+
     if (harmonicField == null) {
       return Center(
         child: Padding(
@@ -2281,9 +2285,12 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     }
 
     final Set<String> usedChords = {};
+    String? startingChord;
     for (var line in _parsedSong.lines) {
       for (var chord in line.chords) {
-        usedChords.add(ChordTransposer.transpose(chord.chord, _transposeSteps.value));
+        final transposedChord = ChordTransposer.transpose(chord.chord, _transposeSteps.value);
+        usedChords.add(transposedChord);
+        startingChord ??= transposedChord;
       }
     }
 
@@ -2292,76 +2299,263 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
     final Set<String> extraChords = usedChords.where((c) {
       final root = HarmonicFieldCalculator.extractRootChord(c);
-      return !diatonicRoots.contains(root);
+      for (var diatonicRoot in diatonicRoots) {
+        if (HarmonicFieldCalculator.areEnharmonicallyEquivalent(root, diatonicRoot)) {
+          return false;
+        }
+      }
+      return true;
     }).toSet();
+
+    final String? modulationKey = HarmonicFieldCalculator.detectModulation(currentKey, extraChords);
+
+    final List<Map<String, dynamic>> previewSections = [];
+    final Set<String> addedBaseTitles = {};
+    
+    String getBaseTitle(String rawTitle) {
+      String base = rawTitle.toUpperCase();
+      base = base.replaceAll(RegExp(r'\s*\d+$'), ''); 
+      base = base.replaceAll(RegExp(r'\s*FINAL$'), ''); 
+      base = base.replaceAll(RegExp(r'\s*REPETIÇÃO$'), ''); 
+      return base.trim();
+    }
+
+    bool isStructuralSection(String rawTitle) {
+      final lower = rawTitle.toLowerCase();
+      if (lower == 'início') return true;
+      
+      if (lower.contains('tab') || 
+          lower.contains('solo') || 
+          lower.contains('final') || 
+          lower.contains('fim') ||
+          lower.contains('instrumental') || 
+          lower.contains('inst') ||
+          lower.contains('interlúdio') ||
+          lower.contains('interludio') ||
+          lower.contains('ministração')) {
+        return false;
+      }
+      return true;
+    }
+
+    final roadmapSections = SongRoadmapBuilder.build(_parsedSong);
+    for (var section in roadmapSections) {
+      if (section.isObs || section.rows.isEmpty) continue;
+      
+      final baseNew = getBaseTitle(section.title);
+      if (!isStructuralSection(section.title)) {
+        continue;
+      }
+      
+      final firstRow = section.rows.first;
+      List<String> flatChords = [];
+      for (var measure in firstRow.measures) {
+        for (var c in measure) {
+          if (flatChords.length < 8) {
+            flatChords.add(ChordTransposer.transpose(c, _transposeSteps.value));
+          }
+        }
+      }
+      
+      String chordSeq = flatChords.join(',');
+      
+      // 1. Tentar mesclar seções que possuem EXATAMENTE os mesmos acordes
+      int existingIndex = previewSections.indexWhere((sec) => sec['chords'].join(',') == chordSeq);
+      if (existingIndex != -1) {
+        String oldRawTitle = previewSections[existingIndex]['rawTitle'];
+        if (!oldRawTitle.toUpperCase().contains(baseNew)) {
+           String? rep1 = previewSections[existingIndex]['repetition'];
+           String? rep2 = firstRow.repetition;
+           
+           String title1 = oldRawTitle;
+           String title2 = section.title;
+           
+           String displayTitle;
+           if (rep1 == rep2) {
+              displayTitle = '$title1 / $title2';
+              if (rep1 != null) {
+                 displayTitle += '  $rep1';
+              }
+           } else {
+              String part1 = title1;
+              if (rep1 != null) part1 += ' $rep1';
+              
+              String part2 = title2;
+              if (rep2 != null) part2 += ' $rep2';
+              
+              displayTitle = '$part1 / $part2';
+           }
+           
+           previewSections[existingIndex]['rawTitle'] = '$title1 / $title2';
+           previewSections[existingIndex]['title'] = displayTitle;
+           
+           // Se a primeira não tinha letra, mas essa tem, aproveita a letra
+           String oldLyrics = previewSections[existingIndex]['lyrics'];
+           String newLyrics = firstRow.hint ?? "";
+           if (oldLyrics.isEmpty && newLyrics.isNotEmpty) {
+             previewSections[existingIndex]['lyrics'] = newLyrics;
+           }
+           
+           addedBaseTitles.add(baseNew);
+        }
+        continue;
+      }
+      
+      // 2. Tentar deduplicar por título
+      if (addedBaseTitles.contains(baseNew)) {
+        continue;
+      }
+      
+      String displayTitle = section.title;
+      if (firstRow.repetition != null) {
+         displayTitle += '  ${firstRow.repetition}';
+      }
+      
+      previewSections.add({
+        'rawTitle': section.title,
+        'repetition': firstRow.repetition,
+        'title': displayTitle,
+        'lyrics': firstRow.hint ?? "",
+        'chords': flatChords,
+      });
+      
+      addedBaseTitles.add(baseNew);
+    }
 
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32.0),
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text('Tom Atual: $currentKey', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: colors.onSurface)),
-            const SizedBox(height: 8),
-            Text('Os acordes em destaque são usados nesta música', style: TextStyle(color: colors.onSurfaceVariant)),
-            const SizedBox(height: 48),
+
+            
+            if (previewSections.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: previewSections.map((section) {
+                    final title = section['title'] as String;
+                    final chords = section['chords'] as List<String>;
+                    final lyrics = section['lyrics'] as String;
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceContainer,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: colors.outline.withOpacity(0.15)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: _fontSize.value - 6.0,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              color: colors.primary,
+                            ),
+                          ),
+                          if (lyrics.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              lyrics,
+                              style: TextStyle(
+                                fontSize: _fontSize.value - 4.0,
+                                fontStyle: FontStyle.italic,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          if (chords.isNotEmpty)
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: chords.map((c) {
+                                final degree = getDegree(c);
+                                Color fnColor = colors.primary;
+                                if (degree != null) {
+                                  final dl = degree.toUpperCase();
+                                  if (['I', 'III', 'VI'].contains(dl)) fnColor = const Color(0xFF2196F3);
+                                  else if (['IV', 'II'].contains(dl)) fnColor = const Color(0xFF4CAF50);
+                                  else if (['V', 'VII'].contains(dl)) fnColor = const Color(0xFFFF9800);
+                                }
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: colors.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: colors.outline.withOpacity(0.1)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      if (degree != null)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: fnColor.withOpacity(0.15),
+                                            borderRadius: const BorderRadius.only(
+                                              topLeft: Radius.circular(5),
+                                              bottomLeft: Radius.circular(5),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            degree,
+                                            style: TextStyle(
+                                              fontSize: _fontSize.value - 5.0,
+                                              fontWeight: FontWeight.bold,
+                                              color: fnColor,
+                                              height: 1.0,
+                                            ),
+                                          ),
+                                        ),
+                                      Container(
+                                        padding: EdgeInsets.only(
+                                          left: degree != null ? 6 : 10,
+                                          right: 10,
+                                          top: 6,
+                                          bottom: 6,
+                                        ),
+                                        child: Text(
+                                          c,
+                                          style: TextStyle(
+                                            fontSize: _fontSize.value - 3.0,
+                                            fontWeight: FontWeight.bold,
+                                            color: colors.onSurface,
+                                            height: 1.0,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                        ],
+                      ),
+                    );
+                    }).toList(),
+                  ),
+              ),
+            ],
+            
+            const SizedBox(height: 16),
             
             // Render the True Circular Wheel
             CircularChordWheel(
               currentKey: currentKey,
               usedChords: usedChords,
+              startingChord: startingChord,
             ),
             
-            const SizedBox(height: 64),
-            
-            if (extraChords.isNotEmpty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainer,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: colors.outline.withOpacity(0.15)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.auto_awesome, color: colors.tertiary, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Acordes Extras', style: TextStyle(
-                          fontSize: 16, 
-                          fontWeight: FontWeight.bold,
-                          color: colors.onSurface
-                        )),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Empréstimos ou preparações fora do tom natural', style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
-                    const SizedBox(height: 24),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      alignment: WrapAlignment.center,
-                      children: extraChords.map((c) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: colors.tertiary.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colors.tertiary.withOpacity(0.5)),
-                        ),
-                        child: Text(c, style: TextStyle(
-                          fontSize: 16, 
-                          fontWeight: FontWeight.bold,
-                          color: colors.tertiary,
-                        )),
-                      )).toList(),
-                    )
-                  ],
-                ),
-              ),
-            ]
           ],
         ),
       ),

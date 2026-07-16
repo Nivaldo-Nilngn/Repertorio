@@ -1159,10 +1159,11 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                               color: colors.surfaceContainer,
                               onSelected: (value) async {
                                 if (value == 'edit') {
+                                  ref.read(selectedSongIdProvider.notifier).select(song.id);
                                   ref.read(editingChordProProvider.notifier).state = song.content;
                                   ref.read(isEditorVisibleProvider.notifier).state = true;
                                   ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                                  ref.read(songFilterProvider.notifier).clear();
+                                  ref.read(songFilterProvider.notifier).setFolder(_activeSetlist?.id);
                                 } else if (value == 'delete') {
                                   final confirm = await showDialog<bool>(
                                     context: context,
@@ -1345,16 +1346,30 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                     style: TextStyle(color: colors.onSurfaceVariant, height: 1.5),
                   ),
                 )
-              : ListView.builder(
+              : ReorderableListView.builder(
                   padding: const EdgeInsets.all(24),
                   itemCount: _activeSetlist!.items.length,
+                  onReorder: (oldIndex, newIndex) {
+                    if (oldIndex < newIndex) {
+                      newIndex -= 1;
+                    }
+                    if (_activeSetlist == null) return;
+                    final items = List<SetlistItem>.from(_activeSetlist!.items);
+                    final item = items.removeAt(oldIndex);
+                    items.insert(newIndex, item);
+                    setState(() {
+                      _activeSetlist = _activeSetlist!.copyWith(items: items);
+                      _isDirty = true;
+                    });
+                  },
                   itemBuilder: (context, index) {
                     final item = _activeSetlist!.items[index];
-                    if (item.type == 'song') {
-                      return _buildSetlistSongItem(index, item, colors);
-                    } else {
-                      return _buildSetlistNoteItem(index, item, colors);
-                    }
+                    return Container(
+                      key: ValueKey('\${item.type}_\${item.title}_$index'),
+                      child: item.type == 'song'
+                          ? _buildSetlistSongItem(index, item, colors)
+                          : _buildSetlistNoteItem(index, item, colors),
+                    );
                   },
                 ),
         ),
@@ -1446,10 +1461,11 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                             final songs = ref.read(songListProvider).value ?? [];
                             try {
                               final matchingSong = songs.firstWhere((s) => s.title == item.title);
+                              ref.read(selectedSongIdProvider.notifier).select(matchingSong.id);
                               ref.read(editingChordProProvider.notifier).state = matchingSong.content;
                               ref.read(isEditorVisibleProvider.notifier).state = true;
                               ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                              ref.read(songFilterProvider.notifier).clear();
+                              ref.read(songFilterProvider.notifier).setFolder(_activeSetlist?.id);
                             } catch (_) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Cifra não encontrada na Biblioteca!'), backgroundColor: Colors.orange),

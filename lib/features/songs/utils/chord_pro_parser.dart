@@ -636,9 +636,16 @@ class SongRoadmapBuilder {
   }
 
   static bool _areCellsEqual(List<String> a, List<String> b) {
-    if (a.length != b.length) return false;
+    if (a.length != b.length) {
+      return false;
+    }
     for (int i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
+      // Limpa tudo que não for letra, número, #, b ou /
+      final ca = a[i].replaceAll(RegExp(r'[^a-zA-Z0-9#b/]'), '').toLowerCase();
+      final cb = b[i].replaceAll(RegExp(r'[^a-zA-Z0-9#b/]'), '').toLowerCase();
+      if (ca != cb) {
+        return false;
+      }
     }
     return true;
   }
