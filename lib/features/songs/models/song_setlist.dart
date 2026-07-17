@@ -54,6 +54,7 @@ class SetlistItem {
   final String key; // key for songs
   final String duration; // duration/time for notes/pauses
   final String? colorHex;
+  final String? songId; // UID da música vinculada
 
   const SetlistItem({
     required this.type,
@@ -62,6 +63,7 @@ class SetlistItem {
     this.key = '',
     this.duration = '',
     this.colorHex,
+    this.songId,
   });
 
   factory SetlistItem.fromJson(Map<String, dynamic> json) {
@@ -72,6 +74,7 @@ class SetlistItem {
       key: json['key'] as String? ?? '',
       duration: json['duration'] as String? ?? '',
       colorHex: json['colorHex'] as String?,
+      songId: json['songId'] as String?,
     );
   }
 
@@ -83,6 +86,7 @@ class SetlistItem {
       'key': key,
       'duration': duration,
       'colorHex': colorHex,
+      'songId': songId,
     };
   }
 
@@ -93,6 +97,7 @@ class SetlistItem {
     String? key,
     String? duration,
     String? colorHex,
+    String? songId,
   }) {
     return SetlistItem(
       type: type ?? this.type,
@@ -101,6 +106,7 @@ class SetlistItem {
       key: key ?? this.key,
       duration: duration ?? this.duration,
       colorHex: colorHex ?? this.colorHex,
+      songId: songId ?? this.songId,
     );
   }
 }

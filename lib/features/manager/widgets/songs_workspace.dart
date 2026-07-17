@@ -554,7 +554,7 @@ E os acordes [G]entre colchetes
         if (matchingSetlist != null) {
           final containsSong = matchingSetlist.items.any((item) =>
               item.type == 'song' &&
-              item.title.trim().toLowerCase() == song.title.trim().toLowerCase());
+              (item.songId == song.id || item.title.trim().toLowerCase() == song.title.trim().toLowerCase()));
           if (!containsSong) return false;
         } else {
           return false;
@@ -570,8 +570,8 @@ E os acordes [G]entre colchetes
       final matchingSetlist = setlists.where((s) => s.id == filter.folderId).firstOrNull;
       if (matchingSetlist != null) {
         filteredSongs.sort((a, b) {
-          final indexA = matchingSetlist.items.indexWhere((item) => item.type == 'song' && item.title.trim().toLowerCase() == a.title.trim().toLowerCase());
-          final indexB = matchingSetlist.items.indexWhere((item) => item.type == 'song' && item.title.trim().toLowerCase() == b.title.trim().toLowerCase());
+          final indexA = matchingSetlist.items.indexWhere((item) => item.type == 'song' && (item.songId == a.id || item.title.trim().toLowerCase() == a.title.trim().toLowerCase()));
+          final indexB = matchingSetlist.items.indexWhere((item) => item.type == 'song' && (item.songId == b.id || item.title.trim().toLowerCase() == b.title.trim().toLowerCase()));
           
           // Se não encontrar (por algum motivo improvável), mantém a ordem
           if (indexA == -1 || indexB == -1) return 0;
@@ -1685,6 +1685,7 @@ E os acordes [G]entre colchetes
             color: colors.surface,
             child: showPreview
                 ? SongViewerScreen(
+                    song: currentSavedSong,
                     chordProText: _currentChordPro,
                     hideAppBar: true,
                     isPreviewMode: isEditorVisible,
@@ -1734,6 +1735,7 @@ class _MobileSongViewerPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SongViewerScreen(
+      song: song,
       chordProText: chordProText,
       hideAppBar: false,
       isPreviewMode: false,

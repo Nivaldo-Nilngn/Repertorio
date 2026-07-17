@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/settings_provider.dart';
+import '../../songs/models/song_setlist.dart';
 
 enum SidebarTab { songs, prepare, artists, favorites, settings }
 
@@ -31,8 +32,59 @@ class SongFilter {
 }
 
 class SongFilterNotifier extends Notifier<SongFilter> {
+  bool _hasInitializedUpcoming = false;
+
   @override
   SongFilter build() => const SongFilter();
+
+  void initializeWithUpcoming(List<SongSetlist> setlists) {
+    if (_hasInitializedUpcoming || setlists.isEmpty) return;
+    _hasInitializedUpcoming = true;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    SongSetlist? closestSetlist;
+    int? minDiff;
+
+    for (final setlist in setlists) {
+      final dateStr = setlist.date;
+      final parsedDate = _parseDate(dateStr);
+      if (parsedDate != null) {
+        final diff = parsedDate.difference(today).inDays;
+        if (diff >= 0) {
+          if (minDiff == null || diff < minDiff) {
+            minDiff = diff;
+            closestSetlist = setlist;
+          }
+        }
+      }
+    }
+
+    if (closestSetlist != null) {
+      // Keep onlyFavorites or artist filters if they were manually set before load, 
+      // but override folderId
+      state = state.copyWith(folderId: closestSetlist.id);
+    }
+  }
+
+  DateTime? _parseDate(String dateStr) {
+    final regex = RegExp(r'^(\d+)\s+([a-zA-ZçÇ]+),\s+(\d+)$');
+    final match = regex.firstMatch(dateStr.trim());
+    if (match != null) {
+      final day = int.tryParse(match.group(1)!);
+      final monthStr = match.group(2)!.toLowerCase();
+      final year = int.tryParse(match.group(3)!);
+      
+      final months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+      final month = months.indexOf(monthStr) + 1;
+      
+      if (day != null && year != null && month > 0) {
+        return DateTime(year, month, day);
+      }
+    }
+    return null;
+  }
 
   void setFolder(String? folderId) {
     state = SongFilter(folderId: folderId);
@@ -48,6 +100,10 @@ class SongFilterNotifier extends Notifier<SongFilter> {
 
   void clear() {
     state = const SongFilter();
+  }
+
+  void clearExceptFolder() {
+    state = SongFilter(folderId: state.folderId, artist: null, onlyFavorites: false);
   }
 }
 

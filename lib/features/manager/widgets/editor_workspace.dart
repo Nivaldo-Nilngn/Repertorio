@@ -1593,6 +1593,7 @@ E os acordes [G]entre colchetes
             color: colors.surface,
             child: showPreview
                 ? SongViewerScreen(
+                    song: currentSavedSong,
                     chordProText: _currentChordPro,
                     hideAppBar: true,
                     isPreviewMode: isEditorVisible,
@@ -1642,6 +1643,7 @@ class _MobileSongViewerPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return SongViewerScreen(
+      song: song,
       chordProText: chordProText,
       hideAppBar: false,
       isPreviewMode: false,

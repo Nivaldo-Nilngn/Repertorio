@@ -35,24 +35,35 @@ class MidiCommand {
 class MidiProfile {
   final String id;
   final String name;
-  // Key is the action name (e.g., 'next_song', 'tone_up')
   final Map<String, MidiCommand> mappings;
+  final String? inputId;
+  final String? outputId;
+  final int channel;
 
   const MidiProfile({
     required this.id,
     required this.name,
     this.mappings = const {},
+    this.inputId,
+    this.outputId,
+    this.channel = 0,
   });
 
   MidiProfile copyWith({
     String? id,
     String? name,
     Map<String, MidiCommand>? mappings,
+    String? inputId,
+    String? outputId,
+    int? channel,
   }) {
     return MidiProfile(
       id: id ?? this.id,
       name: name ?? this.name,
       mappings: mappings ?? this.mappings,
+      inputId: inputId ?? this.inputId,
+      outputId: outputId ?? this.outputId,
+      channel: channel ?? this.channel,
     );
   }
 
@@ -61,6 +72,9 @@ class MidiProfile {
       'id': id,
       'name': name,
       'mappings': mappings.map((k, v) => MapEntry(k, v.toJson())),
+      'inputId': inputId,
+      'outputId': outputId,
+      'channel': channel,
     };
   }
 
@@ -73,6 +87,9 @@ class MidiProfile {
       id: json['id'] as String,
       name: json['name'] as String,
       mappings: mappings,
+      inputId: json['inputId']?.toString(),
+      outputId: json['outputId']?.toString(),
+      channel: json['channel'] != null ? int.tryParse(json['channel'].toString()) ?? 0 : 0,
     );
   }
 }

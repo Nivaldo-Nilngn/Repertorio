@@ -135,34 +135,46 @@ class SongRepository {
       try {
         final value = snapshot.value;
         if (value is Map) {
-          final map = Map<String, dynamic>.from(value);
           final List<Song> parsedSongs = [];
           
-          void parseNode(dynamic nodeData) {
+          void parseNode(String key, dynamic nodeData) {
             if (nodeData is Map) {
-              final nodeMap = Map<String, dynamic>.from(nodeData);
-              if (nodeMap.containsKey('title') || nodeMap.containsKey('content')) {
-                parsedSongs.add(Song.fromJson(nodeMap));
-              } else {
-                for (final child in nodeMap.values) {
-                  parseNode(child);
+              try {
+                final nodeMap = Map<String, dynamic>.from(nodeData);
+                if (nodeMap.containsKey('title') || nodeMap.containsKey('content')) {
+                  if (!nodeMap.containsKey('id') || nodeMap['id'] == null || nodeMap['id'].toString().isEmpty) {
+                    nodeMap['id'] = key;
+                  }
+                  parsedSongs.add(Song.fromJson(nodeMap));
+                } else {
+                  nodeMap.forEach((childKey, childValue) {
+                    parseNode(childKey.toString(), childValue);
+                  });
                 }
+              } catch (e) {
+                print('Error parsing individual song node $key: $e');
               }
             }
           }
 
-          for (final data in map.values) {
-            parseNode(data);
-          }
+          final map = Map<dynamic, dynamic>.from(value);
+          map.forEach((key, val) {
+            parseNode(key.toString(), val);
+          });
           return parsedSongs;
         } else if (value is List) {
           final list = List<dynamic>.from(value);
           return list.where((e) => e != null).map((data) {
-            return Song.fromJson(Map<String, dynamic>.from(data as Map));
-          }).toList();
+            try {
+              return Song.fromJson(Map<String, dynamic>.from(data as Map));
+            } catch (e) {
+              print('Error parsing song from list: $e');
+              return null;
+            }
+          }).whereType<Song>().toList();
         }
-      } catch (e) {
-        print('Error parsing songs from Firebase: $e');
+      } catch (e, stack) {
+        print('Error parsing songs from Firebase: $e\n$stack');
       }
       return <Song>[];
     });

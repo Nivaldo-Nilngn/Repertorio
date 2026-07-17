@@ -12,6 +12,7 @@ import '../providers/editor_provider.dart';
 import '../providers/manager_providers.dart';
 import '../../songs/services/cifra_club_parser.dart';
 import '../../songs/repositories/song_repository.dart';
+import '../../songs/models/song_setlist.dart';
 import '../../midi/widgets/midi_settings_dialog.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../widgets/app_menu.dart';
@@ -130,7 +131,7 @@ E os acordes [G]entre colchetes
 ''';
                         ref.read(isEditorVisibleProvider.notifier).state = true;
                         ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                        ref.read(songFilterProvider.notifier).clear();
+                        ref.read(songFilterProvider.notifier).clearExceptFolder();
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -235,7 +236,7 @@ E os acordes [G]entre colchetes
                               Navigator.pop(context);
                               // Switch to songs tab and clear filters
                               ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                              ref.read(songFilterProvider.notifier).clear();
+                              ref.read(songFilterProvider.notifier).clearExceptFolder();
                               
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Importado com sucesso!'), backgroundColor: Colors.green),
@@ -293,6 +294,13 @@ E os acordes [G]entre colchetes
 
   @override
   Widget build(BuildContext context) {
+    final setlistsAsync = ref.watch(setlistListProvider);
+    if (setlistsAsync.value != null && setlistsAsync.value!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(songFilterProvider.notifier).initializeWithUpcoming(setlistsAsync.value!);
+      });
+    }
+
     final activeTab = ref.watch(sidebarTabProvider);
     final user = ref.watch(authStateProvider).value;
     final displayName = user?.displayName ?? 'Usuário';

@@ -130,7 +130,7 @@ class MidiSettingsDialog extends ConsumerWidget {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    items: state.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
+                    items: state.profiles.map((p) => DropdownMenuItem<String>(value: p.id, child: Text(p.name))).toList(),
                     onChanged: (val) {
                       if (val != null) notifier.setActiveProfile(val);
                     },

@@ -5,8 +5,15 @@ import '../services/midi_service.dart';
 import '../services/midi_storage_service.dart';
 import '../services/midi_web_service.dart';
 
+import 'package:firebase_database/firebase_database.dart';
+import '../../auth/providers/auth_provider.dart';
+
 final midiStorageServiceProvider = Provider<MidiStorageService>((ref) {
-  return MidiStorageService();
+  final auth = ref.watch(firebaseAuthProvider);
+  return MidiStorageService(
+    database: FirebaseDatabase.instance,
+    userId: auth.currentUser?.uid,
+  );
 });
 
 final midiServiceProvider = Provider<MidiService>((ref) {
@@ -99,8 +106,8 @@ class MidiNotifier extends Notifier<MidiState> {
   }
 
   Future<void> _init() async {
-    final profiles = _storage.loadProfiles();
-    final activeProfileId = _storage.loadActiveProfileId() ?? profiles.first.id;
+    final profiles = await _storage.loadProfiles();
+    final activeProfileId = await _storage.loadActiveProfileId() ?? profiles.first.id;
 
     final isSupported = await _midiService.initialize();
     
@@ -135,14 +142,29 @@ class MidiNotifier extends Notifier<MidiState> {
 
   void setActiveInput(String inputId) {
     state = state.copyWith(activeInputId: inputId);
+    _updateActiveProfile(inputId: inputId);
   }
 
   void setActiveOutput(String outputId) {
     state = state.copyWith(activeOutputId: outputId);
+    _updateActiveProfile(outputId: outputId);
   }
 
   void setActiveChannel(int channel) {
     state = state.copyWith(activeChannel: channel);
+    _updateActiveProfile(channel: channel);
+  }
+
+  void _updateActiveProfile({String? inputId, String? outputId, int? channel}) {
+    final profile = state.activeProfile;
+    final updatedProfile = profile.copyWith(
+      inputId: inputId ?? profile.inputId,
+      outputId: outputId ?? profile.outputId,
+      channel: channel ?? profile.channel,
+    );
+    final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
+    state = state.copyWith(profiles: updatedProfiles);
+    _storage.saveProfiles(updatedProfiles);
   }
 
   void triggerPanic() {
@@ -152,17 +174,41 @@ class MidiNotifier extends Notifier<MidiState> {
   }
 
   void setActiveProfile(String profileId) {
-    state = state.copyWith(activeProfileId: profileId);
+    final profile = state.profiles.firstWhere((p) => p.id == profileId, orElse: () => state.profiles.first);
+    state = state.copyWith(
+      activeProfileId: profileId,
+      activeInputId: profile.inputId,
+      activeOutputId: profile.outputId,
+      activeChannel: profile.channel,
+    );
     _storage.saveActiveProfileId(profileId);
   }
 
   void addProfile(String name) {
     final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final newProfile = MidiProfile(id: id, name: name);
+    final newProfile = MidiProfile(
+      id: id, 
+      name: name,
+      inputId: state.activeInputId,
+      outputId: state.activeOutputId,
+      channel: state.activeChannel,
+    );
     final updated = [...state.profiles, newProfile];
     state = state.copyWith(profiles: updated, activeProfileId: id);
     _storage.saveProfiles(updated);
     _storage.saveActiveProfileId(id);
+  }
+
+  void deleteProfile(String profileId) {
+    if (state.profiles.length <= 1) return; // Cannot delete the last profile
+    
+    final updated = state.profiles.where((p) => p.id != profileId).toList();
+    state = state.copyWith(profiles: updated);
+    _storage.saveProfiles(updated);
+
+    if (state.activeProfileId == profileId) {
+      setActiveProfile(updated.first.id);
+    }
   }
 
   void startLearning(String action) {

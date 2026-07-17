@@ -23,6 +23,7 @@ enum SongViewMode { lyrics, roadmap, harmonic }
 
 class SongViewerScreen extends ConsumerStatefulWidget {
   final String chordProText;
+  final Song? song;
   final bool hideAppBar;
   final bool isPreviewMode;
   final bool isFavorite;
@@ -31,6 +32,7 @@ class SongViewerScreen extends ConsumerStatefulWidget {
   const SongViewerScreen({
     super.key,
     required this.chordProText,
+    this.song,
     this.hideAppBar = false,
     this.isPreviewMode = false,
     this.isFavorite = false,
@@ -52,7 +54,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   double _scrollSpeed = 1.0;
   bool _isAutoScrolling = false;
   bool _showChordsPanel = false;
-  SongViewMode _viewMode = SongViewMode.roadmap;
+  SongViewMode _viewMode = SongViewMode.harmonic; // Default to Roda
   bool _isMultiColumn = false;
   late bool _isFavoriteLocal;
 
@@ -101,8 +103,28 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     super.initState();
     _isFavoriteLocal = widget.isFavorite;
     _parsedSong = ChordProParser.parse(widget.chordProText);
+    
+    // Read saved preferences
+    final prefs = ref.read(sharedPreferencesProvider);
+    final savedMode = prefs.getString('last_song_view_mode') ?? 'harmonic';
+    _viewMode = SongViewMode.values.firstWhere(
+      (e) => e.toString().split('.').last == savedMode, 
+      orElse: () => SongViewMode.harmonic
+    );
+
+    if (widget.song != null) {
+      _transposeSteps.value = widget.song!.transposeSteps;
+      final savedFontSize = widget.song!.viewerFontSize;
+      if (savedFontSize != null) {
+        _fontSize.value = savedFontSize;
+      } else {
+        _fontSize.value = (ref.read(settingsProvider).defaultFontSize + 2.0).clamp(10.0, 48.0);
+      }
+    } else {
+      _fontSize.value = (ref.read(settingsProvider).defaultFontSize + 2.0).clamp(10.0, 48.0);
+    }
+
     _registerVideoIframe();
-    _fontSize.value = (ref.read(settingsProvider).defaultFontSize + 2.0).clamp(10.0, 48.0);
     _scrollController.addListener(_onScroll);
     _startFabTimer();
   }
@@ -304,14 +326,31 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
   
+  Timer? _saveTimer;
+
+  void _saveSongSettings() {
+    if (widget.song == null) return;
+    final updatedSong = widget.song!.copyWith(
+      transposeSteps: _transposeSteps.value,
+      viewerFontSize: _fontSize.value,
+    );
+    ref.read(songRepositoryProvider).updateSong(updatedSong);
+  }
+
   void _changeFontSize(double delta) {
     HapticFeedback.lightImpact();
     _fontSize.value = (_fontSize.value + delta).clamp(10.0, 48.0);
+    
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(seconds: 1), _saveSongSettings);
   }
 
   void _changeTranspose(int delta) {
     HapticFeedback.lightImpact();
     _transposeSteps.value += delta;
+    
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(seconds: 1), _saveSongSettings);
   }
 
   @override
@@ -366,6 +405,11 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         break;
       case 'tone_down':
         _changeTranspose(-1);
+        break;
+      case 'tone_reset':
+        if (_transposeSteps.value != 0) {
+          _changeTranspose(-_transposeSteps.value);
+        }
         break;
       // next_song and prev_song can be implemented later by notifying the manager
     }
@@ -575,6 +619,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                             _viewMode = SongViewMode.lyrics;
                           }
                         });
+                        ref.read(settingsProvider.notifier).setViewMode(_viewMode.toString().split('.').last);
                       },
                       colors,
                       isActive: _viewMode != SongViewMode.lyrics,

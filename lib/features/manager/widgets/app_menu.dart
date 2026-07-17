@@ -191,7 +191,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
                 onTap: () {
                   ref.read(sidebarTabProvider.notifier).setTab(item.tab);
                   if (item.tab == SidebarTab.songs) {
-                    ref.read(songFilterProvider.notifier).clear();
+                    ref.read(songFilterProvider.notifier).clearExceptFolder();
                   } else if (item.tab == SidebarTab.favorites) {
                     ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
                   }
@@ -204,7 +204,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
               onTap: () {
                 ref.read(sidebarTabProvider.notifier).setTab(item.tab);
                 if (item.tab == SidebarTab.songs) {
-                  ref.read(songFilterProvider.notifier).clear();
+                  ref.read(songFilterProvider.notifier).clearExceptFolder();
                 } else if (item.tab == SidebarTab.favorites) {
                   ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
                 }
@@ -383,7 +383,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
         onTap: () {
           ref.read(sidebarTabProvider.notifier).setTab(item.tab);
           if (item.tab == SidebarTab.songs) {
-            ref.read(songFilterProvider.notifier).clear();
+            ref.read(songFilterProvider.notifier).clearExceptFolder();
           } else if (item.tab == SidebarTab.favorites) {
             ref.read(songFilterProvider.notifier).setOnlyFavorites(true);
           }

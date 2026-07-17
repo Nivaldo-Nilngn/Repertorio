@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 // Provider global para acessar o SharedPreferences
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
@@ -106,6 +108,20 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> setFontFamily(String font) async {
     state = state.copyWith(fontFamily: font);
     await _prefs.setString(_kFontFamilyKey, font);
+  }
+
+  Future<void> setViewMode(String mode) async {
+    await _prefs.setString('last_song_view_mode', mode);
+    final uid = ref.read(firebaseAuthProvider).currentUser?.uid;
+    if (uid != null) {
+      try {
+        await FirebaseDatabase.instance.ref('users/$uid/settings').update({
+          'last_song_view_mode': mode,
+        });
+      } catch (e) {
+        print('Erro ao salvar viewMode no Firebase: $e');
+      }
+    }
   }
 }
 

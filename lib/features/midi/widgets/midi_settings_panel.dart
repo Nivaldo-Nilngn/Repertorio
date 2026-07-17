@@ -261,11 +261,47 @@ class MidiSettingsPanel extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          _buildDropdown<String>(
-            value: state.activeProfileId,
-            items: state.profiles.map((p) => DropdownMenuItem(value: p.id, child: Text(p.name))).toList(),
-            onChanged: (val) { if (val != null) notifier.setActiveProfile(val); },
-            colors: colors,
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropdown<String>(
+                  value: state.activeProfileId,
+                  items: state.profiles.map((p) => DropdownMenuItem<String>(value: p.id, child: Text(p.name))).toList(),
+                  onChanged: (val) { if (val != null) notifier.setActiveProfile(val); },
+                  colors: colors,
+                ),
+              ),
+              if (state.profiles.length > 1) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  color: colors.error,
+                  tooltip: 'Apagar Perfil',
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        backgroundColor: colors.surfaceContainerHigh,
+                        title: const Text('Apagar Perfil', style: TextStyle(fontWeight: FontWeight.bold)),
+                        content: const Text('Tem certeza que deseja apagar o perfil ativo? Esta ação não pode ser desfeita.'),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCELAR')),
+                          FilledButton(
+                            style: FilledButton.styleFrom(backgroundColor: colors.error),
+                            onPressed: () {
+                              notifier.deleteProfile(state.activeProfileId);
+                              Navigator.pop(ctx);
+                            },
+                            child: const Text('APAGAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -321,6 +357,7 @@ class MidiSettingsPanel extends ConsumerWidget {
                 children: [
                   _buildMappingRow('Subir Tom (+)', 'tone_up', Icons.arrow_drop_up, activeProfile, state, notifier, colors, isMobile),
                   _buildMappingRow('Descer Tom (-)', 'tone_down', Icons.arrow_drop_down, activeProfile, state, notifier, colors, isMobile),
+                  _buildMappingRow('Resetar Tom (Original)', 'tone_reset', Icons.restore, activeProfile, state, notifier, colors, isMobile),
                 ],
               ),
               const SizedBox(height: 24),

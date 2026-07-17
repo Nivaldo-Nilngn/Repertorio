@@ -34,18 +34,34 @@ class HarmonicFieldCalculator {
   static HarmonicField? getField(String key) {
     if (key.isEmpty) return null;
     
+    // Normalize enharmonic major keys to avoid null errors when transposing
+    final enharmonics = {
+      'A#': 'Bb',
+      'D#': 'Eb',
+      'G#': 'Ab',
+      'Cb': 'B',
+      'Fb': 'E',
+      'E#': 'F',
+      'B#': 'C',
+    };
+    
+    String normalizedKey = key;
+    if (!key.endsWith('m') && enharmonics.containsKey(key)) {
+      normalizedKey = enharmonics[key]!;
+    }
+    
     // Se for tom menor, acha a relativa maior
-    if (key.endsWith('m') && !key.endsWith('dim')) {
+    if (normalizedKey.endsWith('m') && !normalizedKey.endsWith('dim')) {
        for (final field in _fields.values) {
-         if (field.vi == key) return field;
+         if (field.vi == normalizedKey) return field;
        }
     }
     
-    if (_fields.containsKey(key)) {
-      return _fields[key];
+    if (_fields.containsKey(normalizedKey)) {
+      return _fields[normalizedKey];
     }
 
-    return _fields[key.replaceAll('m', '')];
+    return _fields[normalizedKey.replaceAll('m', '')];
   }
 
   // Extrai a raiz limpa do acorde para comparação (ex: Cmaj7/E -> C, Dm7 -> Dm)

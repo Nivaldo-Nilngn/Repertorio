@@ -205,6 +205,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
       key: song.key,
       duration: '4:00',
       colorHex: '#ffb95f',
+      songId: song.id,
     );
 
     final updatedItems = List<SetlistItem>.from(_activeSetlist!.items)..add(newItem);
@@ -1390,12 +1391,15 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
 
   Widget _buildSetlistSongItem(int index, SetlistItem item, ColorScheme colors) {
     final stripColor = item.colorHex != null ? Color(int.parse(item.colorHex!.replaceFirst('#', '0xFF'))) : const Color(0xFFffb95f);
+    final savedSongs = ref.watch(songListProvider).value ?? [];
+    final isMissing = !savedSongs.any((s) => (item.songId != null && item.songId == s.id) || item.title.trim().toLowerCase() == s.title.trim().toLowerCase());
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: colors.surfaceContainer.withOpacity(0.6),
+        color: isMissing ? colors.errorContainer.withOpacity(0.3) : colors.surfaceContainer.withOpacity(0.6),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colors.outline.withOpacity(0.3)),
+        border: Border.all(color: isMissing ? colors.error.withOpacity(0.5) : colors.outline.withOpacity(0.3)),
       ),
       child: IntrinsicHeight(
         child: Row(
@@ -1428,9 +1432,28 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(item.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title, 
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold, 
+                              fontSize: 15,
+                              color: isMissing ? colors.error : colors.onSurface,
+                              decoration: isMissing ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
+                        ),
+                        if (isMissing)
+                          Tooltip(
+                            message: 'Música não encontrada na biblioteca. Foi excluída ou renomeada.',
+                            child: Icon(Icons.warning_amber_rounded, color: colors.error, size: 18),
+                          ),
+                      ],
+                    ),
                     if (item.subtitle.isNotEmpty) ...[
-                      Text(item.subtitle, style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+                      Text(item.subtitle, style: TextStyle(color: isMissing ? colors.error.withOpacity(0.8) : colors.onSurfaceVariant, fontSize: 11)),
                     ],
                     const SizedBox(height: 6),
                     // Action row

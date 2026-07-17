@@ -8,6 +8,8 @@ class Song {
   final String? folderId;
   final List<String> tags;
   final bool isFavorite;
+  final int transposeSteps;
+  final double? viewerFontSize;
 
   const Song({
     required this.id,
@@ -19,19 +21,45 @@ class Song {
     this.folderId,
     this.tags = const [],
     this.isFavorite = false,
+    this.transposeSteps = 0,
+    this.viewerFontSize,
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
+    int parsedBpm = 0;
+    if (json['bpm'] != null) {
+      if (json['bpm'] is int) {
+        parsedBpm = json['bpm'] as int;
+      } else if (json['bpm'] is String) {
+        parsedBpm = int.tryParse(json['bpm'] as String) ?? 0;
+      }
+    }
+
+    List<String> parsedTags = [];
+    if (json['tags'] != null) {
+      if (json['tags'] is List) {
+        parsedTags = (json['tags'] as List).map((e) => e.toString()).toList();
+      } else if (json['tags'] is String) {
+        parsedTags = [json['tags'] as String];
+      }
+    }
+
     return Song(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? 'Sem Título',
-      artist: json['artist'] as String? ?? 'Artista Desconhecido',
-      key: json['key'] as String? ?? 'C',
-      bpm: json['bpm'] as int? ?? 0,
-      content: json['content'] as String? ?? '',
-      folderId: json['folderId'] as String?,
-      tags: (json['tags'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
-      isFavorite: json['isFavorite'] as bool? ?? false,
+      id: json['id']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Sem Título',
+      artist: json['artist']?.toString() ?? 'Artista Desconhecido',
+      key: json['key']?.toString() ?? 'C',
+      bpm: parsedBpm,
+      content: json['content']?.toString() ?? '',
+      folderId: json['folderId']?.toString(),
+      tags: parsedTags,
+      isFavorite: json['isFavorite'] == true || json['isFavorite'] == 'true',
+      transposeSteps: json['transposeSteps'] is int 
+          ? json['transposeSteps'] as int 
+          : int.tryParse(json['transposeSteps']?.toString() ?? '0') ?? 0,
+      viewerFontSize: json['viewerFontSize'] is num 
+          ? (json['viewerFontSize'] as num).toDouble() 
+          : double.tryParse(json['viewerFontSize']?.toString() ?? ''),
     );
   }
 
@@ -46,6 +74,8 @@ class Song {
       'folderId': folderId,
       'tags': tags,
       'isFavorite': isFavorite,
+      'transposeSteps': transposeSteps,
+      'viewerFontSize': viewerFontSize,
     };
   }
 
@@ -59,6 +89,8 @@ class Song {
     String? folderId,
     List<String>? tags,
     bool? isFavorite,
+    int? transposeSteps,
+    double? viewerFontSize,
   }) {
     return Song(
       id: id ?? this.id,
@@ -70,6 +102,8 @@ class Song {
       folderId: folderId ?? this.folderId,
       tags: tags ?? this.tags,
       isFavorite: isFavorite ?? this.isFavorite,
+      transposeSteps: transposeSteps ?? this.transposeSteps,
+      viewerFontSize: viewerFontSize ?? this.viewerFontSize,
     );
   }
 }
