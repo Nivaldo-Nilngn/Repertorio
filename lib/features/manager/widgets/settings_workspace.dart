@@ -166,99 +166,134 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     final colors = Theme.of(context).colorScheme;
     final currentTheme = ref.watch(appThemeProvider);
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final isWideScreen = MediaQuery.of(context).size.width >= 1000;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Aparência',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: colors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Personalize as cores e a tipografia do seu aplicativo.',
+                      style: TextStyle(color: colors.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isMobile)
+                Row(
+                  children: [
+                    const Text('Menu no Topo (Navbar)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 12),
+                    Switch(
+                      value: ref.watch(isTopMenuProvider),
+                      onChanged: (val) => ref.read(isTopMenuProvider.notifier).toggle(),
+                      activeColor: colors.primary,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          
+          if (isMobile) ...[
+            const SizedBox(height: 24),
+            SwitchListTile(
+              title: const Text('Menu no Topo (Navbar)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Alterna entre o menu lateral clássico e o menu no topo da tela.'),
+              value: ref.watch(isTopMenuProvider),
+              onChanged: (val) => ref.read(isTopMenuProvider.notifier).toggle(),
+              activeColor: colors.primary,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+          
+          const SizedBox(height: 32),
+          
+          if (!isWideScreen) ...[
+            Text('Temas Clássicos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
+            const SizedBox(height: 12),
+            _buildThemeList([
+              _buildThemeOption(AppThemeType.managerDark, currentTheme),
+              _buildThemeOption(AppThemeType.managerLight, currentTheme),
+              _buildCustomThemeOption(currentTheme),
+            ], isMobile),
+            const SizedBox(height: 24),
+            Text('Combos Cafeteria (Premium)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
+            const SizedBox(height: 12),
+            _buildThemeList([
+              _buildThemeOption(AppThemeType.cafeteriaModerna, currentTheme),
+              _buildThemeOption(AppThemeType.graoGourmet, currentTheme),
+              _buildThemeOption(AppThemeType.bistroVintage, currentTheme),
+            ], isMobile),
+          ] else ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Temas Clássicos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
+                      const SizedBox(height: 12),
+                      _buildThemeList([
+                        _buildThemeOption(AppThemeType.managerDark, currentTheme),
+                        _buildThemeOption(AppThemeType.managerLight, currentTheme),
+                        _buildCustomThemeOption(currentTheme),
+                      ], isMobile),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 32),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Combos Cafeteria (Premium)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface)),
+                      const SizedBox(height: 12),
+                      _buildThemeList([
+                        _buildThemeOption(AppThemeType.cafeteriaModerna, currentTheme),
+                        _buildThemeOption(AppThemeType.graoGourmet, currentTheme),
+                        _buildThemeOption(AppThemeType.bistroVintage, currentTheme),
+                      ], isMobile),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          
+          const SizedBox(height: 32),
+          Divider(color: colors.outline.withOpacity(0.2)),
+          const SizedBox(height: 24),
+
           Text(
-            'Aparência',
+            'Opções do Leitor (Palco)',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: colors.primary,
                   fontWeight: FontWeight.bold,
                 ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Personalize as cores e a tipografia do seu aplicativo.',
-            style: TextStyle(color: colors.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
-          
-          // Layout Toggle
-          if (!isMobile) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: colors.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: colors.outline.withOpacity(0.2)),
-              ),
-              child: SwitchListTile(
-                title: const Text('Menu no Topo (Navbar)', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Alterna entre o menu lateral clássico e o menu no topo da tela.'),
-                value: ref.watch(isTopMenuProvider),
-                onChanged: (val) {
-                  ref.read(isTopMenuProvider.notifier).toggle();
-                },
-                activeColor: colors.primary,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const SizedBox(height: 32),
-          ],
-          
-          Text(
-            'Temas Clássicos',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: isMobile ? 12 : 16,
-            runSpacing: isMobile ? 12 : 16,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildThemeOption(AppThemeType.managerDark, currentTheme),
-              _buildThemeOption(AppThemeType.managerLight, currentTheme),
-              _buildCustomThemeOption(currentTheme),
-            ],
-          ),
-          
-          const SizedBox(height: 32),
-          Text(
-            'Combos Cafeteria (Premium)',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colors.onSurface),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: isMobile ? 12 : 16,
-            runSpacing: isMobile ? 12 : 16,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildThemeOption(AppThemeType.cafeteriaModerna, currentTheme),
-              _buildThemeOption(AppThemeType.graoGourmet, currentTheme),
-              _buildThemeOption(AppThemeType.bistroVintage, currentTheme),
-            ],
-          ),
-          
-          const SizedBox(height: 48),
-          Divider(color: colors.outline.withOpacity(0.2)),
-          const SizedBox(height: 32),
-
-          Text(
-            'Opções do Leitor (Palco)',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: colors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             'Configurações persistentes para facilitar a leitura durante apresentações.',
             style: TextStyle(color: colors.onSurfaceVariant),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
           _buildSettingsCard(),
         ],
@@ -266,11 +301,25 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     );
   }
 
+  Widget _buildThemeList(List<Widget> options, bool isMobile) {
+    if (isMobile) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: options.map((opt) => Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: opt))).toList(),
+      );
+    } else {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: options.map((opt) => Padding(padding: const EdgeInsets.only(bottom: 12), child: opt)).toList(),
+      );
+    }
+  }
+
   Widget _buildSettingsCard() {
     final colors = Theme.of(context).colorScheme;
     final settings = ref.watch(settingsProvider);
     final settingsNotifier = ref.read(settingsProvider.notifier);
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = MediaQuery.of(context).size.width < 800; // Use a slightly larger breakpoint for the card to avoid cramped row
 
     final List<String> availableFonts = [
       'Inter', 'Roboto Mono', 'Fira Code', 'Poppins', 'Playfair Display', 'Arvo', 'Segoe UI', 'Consolas'
@@ -287,19 +336,11 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colors.outline.withOpacity(0.2)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildFontFamilySelector(colors, selectedFont, availableFonts, settingsNotifier),
-                    const SizedBox(height: 24),
-                    _buildFontSizeSelector(colors, settings, settingsNotifier),
-                  ],
-                )
-              : Row(
+      child: isMobile
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: _buildFontFamilySelector(colors, selectedFont, availableFonts, settingsNotifier)),
@@ -307,43 +348,72 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                     Expanded(child: _buildFontSizeSelector(colors, settings, settingsNotifier)),
                   ],
                 ),
-          
-          const SizedBox(height: 32),
-          Text('Preview no Palco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.onSurfaceVariant)),
-          const SizedBox(height: 12),
-          
-          // Feedback visual imediato da cifra/letra
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: colors.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colors.outline.withOpacity(0.3)),
-            ),
-            child: Column(
+                const SizedBox(height: 32),
+                Text('Preview no Palco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.onSurfaceVariant)),
+                const SizedBox(height: 12),
+                _buildPreviewBox(colors, settings, selectedFont),
+              ],
+            )
+          : Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Am7   D9',
-                  style: TextStyle(
-                    fontFamily: 'Consolas',
-                    fontSize: settings.defaultFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: colors.onSurface,
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildFontFamilySelector(colors, selectedFont, availableFonts, settingsNotifier),
+                      const SizedBox(height: 32),
+                      _buildFontSizeSelector(colors, settings, settingsNotifier),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Exemplo de como ficará a música',
-                  style: TextStyle(
-                    fontFamily: selectedFont,
-                    color: colors.primary,
-                    fontStyle: FontStyle.italic,
-                    fontSize: settings.defaultFontSize - 2.0,
+                const SizedBox(width: 48),
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Preview no Palco', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: colors.onSurfaceVariant)),
+                      const SizedBox(height: 12),
+                      _buildPreviewBox(colors, settings, selectedFont),
+                    ],
                   ),
                 ),
               ],
+            ),
+    );
+  }
+
+  Widget _buildPreviewBox(ColorScheme colors, dynamic settings, String selectedFont) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colors.outline.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Am7   D9',
+            style: TextStyle(
+              fontFamily: 'Consolas',
+              fontSize: settings.defaultFontSize,
+              fontWeight: FontWeight.bold,
+              color: colors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Exemplo de como ficará a música',
+            style: TextStyle(
+              fontFamily: selectedFont,
+              color: colors.primary,
+              fontStyle: FontStyle.italic,
+              fontSize: settings.defaultFontSize - 2.0,
             ),
           ),
         ],
@@ -373,12 +443,13 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           value: selectedFont,
+          isExpanded: true,
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
           dropdownColor: colors.surfaceContainerHigh,
-          items: availableFonts.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+          items: availableFonts.map((f) => DropdownMenuItem(value: f, child: Text(f, overflow: TextOverflow.ellipsis))).toList(),
           onChanged: (val) {
             if (val != null) settingsNotifier.setFontFamily(val);
           },
@@ -457,14 +528,14 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: isMobile ? (MediaQuery.of(context).size.width - 60) / 3 : 320,
+        width: isMobile ? (MediaQuery.of(context).size.width - 60) / 3 : null,
         padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 16, vertical: 12),
         decoration: BoxDecoration(
           color: themeData.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive ? themeData.colorScheme.primary : themeData.colorScheme.outline.withOpacity(0.2),
-            width: isActive ? 2 : 1,
+            width: 2,
           ),
           boxShadow: isActive ? [
             BoxShadow(
@@ -486,25 +557,33 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                   style: TextStyle(
                     color: themeData.colorScheme.onSurface,
                     fontSize: 11,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (isActive) ...[
-                  const SizedBox(height: 6),
-                  InkWell(
-                    onTap: () {
-                      if (isMobile) {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeBuilderModal()));
-                      } else {
-                        showDialog(
-                          context: context,
-                          builder: (context) => const ThemeBuilderModal(),
-                        );
-                      }
-                    },
-                    child: Icon(Icons.palette, size: 16, color: themeData.colorScheme.primary),
+                Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: isActive,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () {
+                          if (isMobile) {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => const ThemeBuilderModal()));
+                          } else {
+                            showDialog(
+                              context: context,
+                              builder: (context) => const ThemeBuilderModal(),
+                            );
+                          }
+                        },
+                        child: Icon(Icons.palette, size: 16, color: themeData.colorScheme.primary),
+                      ),
+                    ],
                   ),
-                ]
+                ),
               ],
             )
           : Row(
@@ -517,12 +596,16 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                     style: TextStyle(
                       color: themeData.colorScheme.onSurface,
                       fontSize: 16,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                if (isActive) ...[
-                  IconButton(
+                Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: isActive,
+                  child: IconButton(
                     tooltip: 'Editar Cores',
                     onPressed: () {
                       if (isMobile) {
@@ -537,7 +620,7 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                     icon: const Icon(Icons.palette, size: 20),
                     color: themeData.colorScheme.primary,
                   ),
-                ],
+                ),
               ],
             ),
       ),
@@ -555,14 +638,14 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        width: isMobile ? (MediaQuery.of(context).size.width - 60) / 3 : 320,
+        width: isMobile ? null : null, // Removed fixed width, controlled by parent layout
         padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 16, vertical: 12),
         decoration: BoxDecoration(
           color: themeData.colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isActive ? themeData.colorScheme.primary : themeData.colorScheme.outline.withOpacity(0.2),
-            width: isActive ? 2 : 1,
+            width: 2,
           ),
           boxShadow: isActive ? [
             BoxShadow(
@@ -584,13 +667,21 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                   style: TextStyle(
                     color: themeData.colorScheme.onSurface,
                     fontSize: 11,
-                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (isActive) ...[
-                  const SizedBox(height: 6),
-                  Icon(Icons.check_circle, size: 16, color: themeData.colorScheme.primary),
-                ],
+                Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: isActive,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 6),
+                      Icon(Icons.check_circle, size: 16, color: themeData.colorScheme.primary),
+                    ],
+                  ),
+                ),
               ],
             )
           : Row(
@@ -603,12 +694,17 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                     style: TextStyle(
                       color: themeData.colorScheme.onSurface,
                       fontSize: 16,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                if (isActive)
-                  Icon(Icons.check_circle, color: themeData.colorScheme.primary),
+                Visibility(
+                  maintainSize: true,
+                  maintainAnimation: true,
+                  maintainState: true,
+                  visible: isActive,
+                  child: Icon(Icons.check_circle, color: themeData.colorScheme.primary),
+                ),
               ],
             ),
       ),
@@ -664,6 +760,14 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
     final displayName = user?.displayName ?? user?.email?.split('@').first ?? 'Usuário';
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    final songs = ref.watch(songListProvider).value ?? [];
+    final setlists = ref.watch(setlistListProvider).value ?? [];
+    
+    final artistSet = <String>{};
+    for (var s in songs) {
+      if (s.artist.isNotEmpty) artistSet.add(s.artist);
+    }
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
       child: Column(
@@ -705,211 +809,139 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
                 )
               ],
             ),
-            child: isMobile
-                ? Column(
-                    children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colors.primary.withOpacity(0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                )
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 42,
-                              backgroundColor: colors.primaryContainer,
-                              child: Text(
-                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Função de trocar foto em breve!')),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: colors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: colors.surfaceContainer, width: 2),
-                              ),
-                              child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
-                            ),
-                          ),
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colors.primary.withOpacity(0.3),
+                            blurRadius: 15,
+                            spreadRadius: 2,
+                          )
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      Column(
-                        children: [
-                          Text(
+                      child: CircleAvatar(
+                        radius: 42,
+                        backgroundColor: colors.primaryContainer,
+                        backgroundImage: user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
+                        child: user?.photoURL == null
+                            ? Text(
+                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
+                              )
+                            : null,
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Função de trocar foto em breve!')),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colors.surfaceContainer, width: 2),
+                        ),
+                        child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Column(
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
                             displayName,
                             textAlign: TextAlign.center,
                             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: colors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              user?.email ?? 'Sem e-mail vinculado',
-                              style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Função de alterar senha em breve!')),
-                            );
-                          },
-                          icon: const Icon(Icons.password, size: 18),
-                          label: const Text('Alterar Senha'),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: () => ref.read(firebaseAuthProvider).signOut(),
-                          icon: const Icon(Icons.logout, size: 18),
-                          label: const Text('Sair da Conta'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colors.error.withOpacity(0.1),
-                            foregroundColor: colors.error,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [Colors.amber.shade700, Colors.orangeAccent]),
+                            borderRadius: BorderRadius.circular(6),
                           ),
+                          child: const Text('PRO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: colors.primary.withOpacity(0.5), width: 3),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: colors.primary.withOpacity(0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
-                                )
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 42,
-                              backgroundColor: colors.primaryContainer,
-                              child: Text(
-                                displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
-                                style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: colors.primary),
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Função de trocar foto em breve!')),
-                              );
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: colors.primary,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: colors.surfaceContainer, width: 2),
-                              ),
-                              child: Icon(Icons.camera_alt, size: 16, color: colors.onPrimary),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        user?.email ?? 'Sem e-mail vinculado',
+                        style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 32),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              displayName,
-                              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: colors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                user?.email ?? 'Sem e-mail vinculado',
-                                style: TextStyle(color: colors.primary, fontWeight: FontWeight.w500, fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          FilledButton.icon(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Função de alterar senha em breve!')),
-                              );
-                            },
-                            icon: const Icon(Icons.password, size: 18),
-                            label: const Text('Alterar Senha'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton.icon(
-                            onPressed: () => ref.read(firebaseAuthProvider).signOut(),
-                            icon: const Icon(Icons.logout, size: 18),
-                            label: const Text('Sair da Conta'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: colors.error.withOpacity(0.1),
-                              foregroundColor: colors.error,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 24,
+                  runSpacing: 16,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _buildStatItem('Músicas', songs.length.toString(), Icons.music_note, colors),
+                    _buildStatItem('Repertórios', setlists.length.toString(), Icons.queue_music, colors),
+                    _buildStatItem('Artistas', artistSet.length.toString(), Icons.mic, colors),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Função de alterar senha em breve!')),
+                      );
+                    },
+                    icon: const Icon(Icons.password, size: 18),
+                    label: const Text('Alterar Senha'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => ref.read(firebaseAuthProvider).signOut(),
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Sair da Conta'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.error.withOpacity(0.1),
+                      foregroundColor: colors.error,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           
           const SizedBox(height: 48),
@@ -1034,23 +1066,24 @@ class _SettingsWorkspaceState extends ConsumerState<SettingsWorkspace> {
       ),
     );
 
-    if (isMobile) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          content,
-          const SizedBox(height: 16),
-          button,
-        ],
-      );
-    }
-
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: content),
-        const SizedBox(width: 16),
+        content,
+        const SizedBox(height: 16),
         button,
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon, ColorScheme colors) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, color: colors.primary.withOpacity(0.8), size: 24),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
       ],
     );
   }

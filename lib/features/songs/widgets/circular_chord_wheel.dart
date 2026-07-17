@@ -62,105 +62,123 @@ class CircularChordWheel extends StatelessWidget {
           size = math.min(size, 600.0);
         }
         final wheelSize = size * 0.82;
+        final isWide = constraints.maxWidth > 650;
         
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipRect(
-              child: Align(
-                alignment: Alignment.topCenter,
-                heightFactor: 0.62, // Corta a parte de baixo da roda
-                child: SizedBox(
-                  width: size,
-                  height: size,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // The rotating background wheel
-                      TweenAnimationBuilder<double>(
-                        tween: Tween<double>(
-                          begin: -keyIndex / 12.0, 
-                          end: -keyIndex / 12.0
-                        ),
-                        duration: const Duration(milliseconds: 600),
-                        curve: Curves.easeInOutCubic,
-                        builder: (context, rotationTurns, child) {
-                          return SizedBox(
-                            width: wheelSize,
-                            height: wheelSize,
-                            child: CustomPaint(
-                              painter: _WheelBasePainter(
-                                colors: colors,
-                                usedChords: usedChords,
-                                majorKeys: majorKeys,
-                                minorKeys: minorKeys,
-                                dimKeys: dimKeys,
-                                rotationTurns: rotationTurns,
-                                startingChord: startingChord,
-                                isMinorKey: isMinorKey,
-                                activeKeyIndex: keyIndex,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      
-                      // The static mask (always at the top)
-                      SizedBox(
+        final wheelWidget = ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: 0.58, // Corta a parte de baixo da roda e aproxima do topo
+            child: SizedBox(
+              width: wheelSize,
+              height: wheelSize,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // The rotating background wheel
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(
+                      begin: -keyIndex / 12.0, 
+                      end: -keyIndex / 12.0
+                    ),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeInOutCubic,
+                    builder: (context, rotationTurns, child) {
+                      return SizedBox(
                         width: wheelSize,
                         height: wheelSize,
                         child: CustomPaint(
-                          painter: _WheelMaskPainter(colors: colors, isMinorKey: isMinorKey),
-                        ),
-                      ),
-                      
-                      // Key center label
-                      Container(
-                        width: wheelSize * 0.18,
-                        height: wheelSize * 0.18,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainer,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colors.outline.withOpacity(0.3), width: 2),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          currentKey,
-                          style: TextStyle(
-                            fontSize: wheelSize * 0.05,
-                            fontWeight: FontWeight.bold,
-                            color: colors.onSurface,
+                          painter: _WheelBasePainter(
+                            colors: colors,
+                            usedChords: usedChords,
+                            majorKeys: majorKeys,
+                            minorKeys: minorKeys,
+                            dimKeys: dimKeys,
+                            rotationTurns: rotationTurns,
+                            startingChord: startingChord,
+                            isMinorKey: isMinorKey,
+                            activeKeyIndex: keyIndex,
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
+                  
+                  // The static mask (always at the top)
+                  SizedBox(
+                    width: wheelSize,
+                    height: wheelSize,
+                    child: CustomPaint(
+                      painter: _WheelMaskPainter(colors: colors, isMinorKey: isMinorKey),
+                    ),
+                  ),
+                  
+                  // Key center label
+                  Container(
+                    width: wheelSize * 0.18,
+                    height: wheelSize * 0.18,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainer,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colors.outline.withOpacity(0.3), width: 2),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      currentKey,
+                      style: TextStyle(
+                        fontSize: wheelSize * 0.05,
+                        fontWeight: FontWeight.bold,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+        final legendWidget = Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.outlineVariant.withOpacity(0.2)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'FUNÇÕES HARMÔNICAS',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
-            ),
-            
-            // Legenda Responsiva Embaixo
-            const SizedBox(height: 24),
-            Text(
-              'FUNÇÕES HARMÔNICAS',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                color: colors.onSurfaceVariant,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLegendItem('🛋️', 'TÔNICA', 'Descanso', const Color(0xFF2196F3)),
+                    const SizedBox(width: 16),
+                    _buildLegendItem('🚶', 'SUBDOMINANTE', 'Movimento', const Color(0xFF4CAF50)),
+                    const SizedBox(width: 16),
+                    _buildLegendItem('🏎️', 'DOMINANTE', 'Tensão', const Color(0xFFFF9800)),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 24,
-              runSpacing: 16,
-              children: [
-                _buildLegendItem('🛋️', 'TÔNICA', 'Descanso', const Color(0xFF2196F3)),
-                _buildLegendItem('🚶', 'SUBDOMINANTE', 'Movimento', const Color(0xFF4CAF50)),
-                _buildLegendItem('🏎️', 'DOMINANTE', 'Tensão', const Color(0xFFFF9800)),
-              ],
-            ),
+            ],
+          ),
+        );
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            wheelWidget,
+            const SizedBox(height: 24),
+            legendWidget,
           ],
         );
       },

@@ -547,25 +547,28 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                     const SizedBox(height: 16),
                   ],
                   // Content (Lyrics or Roadmap)
-                  AnimatedBuilder(
-                    animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
-                    builder: (context, _) {
-                      final child = _viewMode == SongViewMode.harmonic
-                          ? _buildHarmonicFieldContent()
-                          : _viewMode == SongViewMode.roadmap
-                          ? _buildRoadmapContent()
-                          : SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: _buildLyricsContent(),
-                            );
-                      return AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        transitionBuilder: (Widget child, Animation<double> animation) {
-                          return FadeTransition(opacity: animation, child: child);
-                        },
-                        child: child,
-                      );
-                    },
+                  SizedBox(
+                    width: double.infinity,
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                      builder: (context, _) {
+                        final child = _viewMode == SongViewMode.harmonic
+                            ? _buildHarmonicFieldContent()
+                            : _viewMode == SongViewMode.roadmap
+                            ? _buildRoadmapContent()
+                            : SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: _buildLyricsContent(),
+                              );
+                        return AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          transitionBuilder: (Widget child, Animation<double> animation) {
+                            return FadeTransition(opacity: animation, child: child);
+                          },
+                          child: child,
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -589,11 +592,26 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             duration: const Duration(milliseconds: 300),
             child: ConstrainedBox(
               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Container(
+                width: 72,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                  border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                     _buildFloatingTile(Icons.auto_fix_high, 'Editar', () {
                       ref.read(isEditorVisibleProvider.notifier).state = !ref.read(isEditorVisibleProvider);
                     }, colors, isActive: ref.watch(isEditorVisibleProvider)),
@@ -624,116 +642,82 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                       colors,
                       isActive: _viewMode != SongViewMode.lyrics,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainer,
-                          border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.hardEdge,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text('TEXTO', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        _startFabTimer();
-                                        _changeFontSize(-2);
-                                      },
-                                      child: Center(
-                                        child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
-                                      ),
+                    Container(
+                      width: 60,
+                      height: 54,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text('TEXTO', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      _startFabTimer();
+                                      _changeFontSize(-2);
+                                    },
+                                    child: Center(
+                                      child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
                                     ),
                                   ),
-                                  VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        _startFabTimer();
-                                        _changeFontSize(2);
-                                      },
-                                      child: Center(
-                                        child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
-                                      ),
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      _startFabTimer();
+                                      _changeFontSize(2);
+                                    },
+                                    child: Center(
+                                      child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceContainer,
-                          border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.hardEdge,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 4),
-                            Text('TOM', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        _startFabTimer();
-                                        _changeTranspose(-1);
-                                      },
-                                      child: Center(
-                                        child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
-                                      ),
+                    Container(
+                      width: 60,
+                      height: 54,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 4),
+                          Text('TOM', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      _startFabTimer();
+                                      _changeTranspose(-1);
+                                    },
+                                    child: Center(
+                                      child: Icon(Icons.remove, size: 16, color: colors.onSurfaceVariant),
                                     ),
                                   ),
-                                  VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
-                                  Expanded(
-                                    child: InkWell(
-                                      onTap: () {
-                                        _startFabTimer();
-                                        _changeTranspose(1);
-                                      },
-                                      child: Center(
-                                        child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
-                                      ),
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      _startFabTimer();
+                                      _changeTranspose(1);
+                                    },
+                                    child: Center(
+                                      child: Icon(Icons.add, size: 16, color: colors.onSurfaceVariant),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     _buildFloatingTile(Icons.music_note, 'Acordes', () {
@@ -789,6 +773,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             ),
           ),
         ),
+        ),
       );
         }
 
@@ -827,25 +812,28 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        AnimatedBuilder(
-                                          animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
-                                          builder: (context, _) {
-                                            final child = _viewMode == SongViewMode.harmonic
-                                                ? _buildHarmonicFieldContent()
-                                                : _viewMode == SongViewMode.roadmap
-                                                ? _buildRoadmapContent()
-                                                : SingleChildScrollView(
-                                                    scrollDirection: Axis.horizontal,
-                                                    child: _buildLyricsContent(),
-                                                  );
-                                            return AnimatedSwitcher(
-                                              duration: const Duration(milliseconds: 300),
-                                              transitionBuilder: (Widget child, Animation<double> animation) {
-                                                return FadeTransition(opacity: animation, child: child);
-                                              },
-                                              child: child,
-                                            );
-                                          },
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: AnimatedBuilder(
+                                            animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                                            builder: (context, _) {
+                                              final child = _viewMode == SongViewMode.harmonic
+                                                  ? _buildHarmonicFieldContent()
+                                                  : _viewMode == SongViewMode.roadmap
+                                                  ? _buildRoadmapContent()
+                                                  : SingleChildScrollView(
+                                                      scrollDirection: Axis.horizontal,
+                                                      child: _buildLyricsContent(),
+                                                    );
+                                              return AnimatedSwitcher(
+                                                duration: const Duration(milliseconds: 300),
+                                                transitionBuilder: (Widget child, Animation<double> animation) {
+                                                  return FadeTransition(opacity: animation, child: child);
+                                                },
+                                                child: child,
+                                              );
+                                            },
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -916,41 +904,30 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   Widget _buildFloatingTile(IconData icon, String label, VoidCallback onTap, ColorScheme colors, {bool isActive = false}) {
     return Padding(
-      padding: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: InkWell(
         onTap: () {
           _startFabTimer();
           onTap();
         },
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           width: 60,
-          height: 60,
+          height: 54,
           decoration: BoxDecoration(
-            color: isActive ? colors.primary.withOpacity(0.15) : colors.surfaceContainer,
-            border: Border.all(
-              color: isActive ? colors.primary : colors.outlineVariant.withOpacity(0.2), 
-              width: 1.5
-            ),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            color: isActive ? colors.primary.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 20, color: isActive ? colors.primary : colors.onSurfaceVariant),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 9,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   color: isActive ? colors.primary : colors.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
@@ -1021,19 +998,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 
                 // Compact Font Size Control Tile
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Container(
                     width: 72,
-                    height: 72,
+                    height: 64,
                     decoration: BoxDecoration(
-                      border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colors.surfaceContainerHighest.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     clipBehavior: Clip.hardEdge,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text('TEXTO', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
                         Expanded(
                           child: Row(
@@ -1046,7 +1023,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                   ),
                                 ),
                               ),
-                              VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
                               Expanded(
                                 child: InkWell(
                                   onTap: () => _changeFontSize(2),
@@ -1065,19 +1041,19 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 
                 // Compact Transpose Control Tile
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6.0),
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Container(
                     width: 72,
-                    height: 72,
+                    height: 64,
                     decoration: BoxDecoration(
-                      border: Border.all(color: colors.outlineVariant.withOpacity(0.2), width: 1.5),
-                      borderRadius: BorderRadius.circular(8),
+                      color: colors.surfaceContainerHighest.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     clipBehavior: Clip.hardEdge,
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Text('TOM', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
                         Expanded(
                           child: Row(
@@ -1090,7 +1066,6 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                                   ),
                                 ),
                               ),
-                              VerticalDivider(width: 1, color: colors.outlineVariant.withOpacity(0.2), indent: 4, endIndent: 4),
                               Expanded(
                                 child: InkWell(
                                   onTap: () => _changeTranspose(1),
@@ -1194,24 +1169,18 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }) {
     final colors = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
           width: 72,
-          height: 72,
+          height: 64,
           decoration: BoxDecoration(
             color: isActive 
                 ? colors.primary.withOpacity(0.15) 
                 : Colors.transparent,
-            border: Border.all(
-              color: isActive 
-                  ? colors.primary 
-                  : colors.outlineVariant.withOpacity(0.2),
-              width: 1.5,
-            ),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -1221,12 +1190,12 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                 size: 24,
                 color: isActive ? colors.primary : colors.onSurfaceVariant,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   color: isActive ? colors.primary : colors.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
@@ -2467,144 +2436,141 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       addedBaseTitles.add(baseNew);
     }
 
-    return Center(
+    return SizedBox(
+      width: double.infinity,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
 
-            
-            if (previewSections.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: previewSections.map((section) {
-                    final title = section['title'] as String;
-                    final chords = section['chords'] as List<String>;
-                    final lyrics = section['lyrics'] as String;
-                    
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceContainer,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: colors.outline.withOpacity(0.15)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: _fontSize.value - 6.0,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                              color: colors.primary,
-                            ),
+          
+          if (previewSections.isNotEmpty) ...[
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: previewSections.map((section) {
+                final title = section['title'] as String;
+                final chords = section['chords'] as List<String>;
+                final lyrics = section['lyrics'] as String;
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainer,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: colors.outline.withOpacity(0.15)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: _fontSize.value - 6.0,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: colors.primary,
                           ),
-                          if (lyrics.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              lyrics,
-                              style: TextStyle(
-                                fontSize: _fontSize.value - 4.0,
-                                fontStyle: FontStyle.italic,
-                                color: colors.onSurfaceVariant,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        ),
+                        if (lyrics.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            lyrics,
+                            style: TextStyle(
+                              fontSize: _fontSize.value - 4.0,
+                              fontStyle: FontStyle.italic,
+                              color: colors.onSurfaceVariant,
                             ),
-                          ],
-                          const SizedBox(height: 8),
-                          if (chords.isNotEmpty)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: chords.map((c) {
-                                final degree = getDegree(c);
-                                Color fnColor = colors.primary;
-                                if (degree != null) {
-                                  final dl = degree.toUpperCase();
-                                  if (['I', 'III', 'VI'].contains(dl)) fnColor = const Color(0xFF2196F3);
-                                  else if (['IV', 'II'].contains(dl)) fnColor = const Color(0xFF4CAF50);
-                                  else if (['V', 'VII'].contains(dl)) fnColor = const Color(0xFFFF9800);
-                                }
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: colors.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: colors.outline.withOpacity(0.1)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      if (degree != null)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-                                          decoration: BoxDecoration(
-                                            color: fnColor.withOpacity(0.15),
-                                            borderRadius: const BorderRadius.only(
-                                              topLeft: Radius.circular(5),
-                                              bottomLeft: Radius.circular(5),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            degree,
-                                            style: TextStyle(
-                                              fontSize: _fontSize.value - 5.0,
-                                              fontWeight: FontWeight.bold,
-                                              color: fnColor,
-                                              height: 1.0,
-                                            ),
-                                          ),
-                                        ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        if (chords.isNotEmpty)
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: chords.map((c) {
+                              final degree = getDegree(c);
+                              Color fnColor = colors.primary;
+                              if (degree != null) {
+                                final dl = degree.toUpperCase();
+                                if (['I', 'III', 'VI'].contains(dl)) fnColor = const Color(0xFF2196F3);
+                                else if (['IV', 'II'].contains(dl)) fnColor = const Color(0xFF4CAF50);
+                                else if (['V', 'VII'].contains(dl)) fnColor = const Color(0xFFFF9800);
+                              }
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: colors.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: colors.outline.withOpacity(0.1)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    if (degree != null)
                                       Container(
-                                        padding: EdgeInsets.only(
-                                          left: degree != null ? 6 : 10,
-                                          right: 10,
-                                          top: 6,
-                                          bottom: 6,
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: fnColor.withOpacity(0.15),
+                                          borderRadius: const BorderRadius.only(
+                                            topLeft: Radius.circular(5),
+                                            bottomLeft: Radius.circular(5),
+                                          ),
                                         ),
                                         child: Text(
-                                          c,
+                                          degree,
                                           style: TextStyle(
-                                            fontSize: _fontSize.value - 3.0,
+                                            fontSize: _fontSize.value - 5.0,
                                             fontWeight: FontWeight.bold,
-                                            color: colors.onSurface,
+                                            color: fnColor,
                                             height: 1.0,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                        ],
-                      ),
-                    );
-                    }).toList(),
-                  ),
-              ),
-            ],
-            
-            const SizedBox(height: 16),
-            
-            // Render the True Circular Wheel
-            CircularChordWheel(
-              currentKey: currentKey,
-              usedChords: usedChords,
-              startingChord: startingChord,
-            ),
-            
+                                    Container(
+                                      padding: EdgeInsets.only(
+                                        left: degree != null ? 6 : 10,
+                                        right: 10,
+                                        top: 6,
+                                        bottom: 6,
+                                      ),
+                                      child: Text(
+                                        c,
+                                        style: TextStyle(
+                                          fontSize: _fontSize.value - 3.0,
+                                          fontWeight: FontWeight.bold,
+                                          color: colors.onSurface,
+                                          height: 1.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                      ],
+                    ),
+                  );
+                  }).toList(),
+                ),
           ],
-        ),
+          
+          const SizedBox(height: 16),
+          
+          // Render the True Circular Wheel
+          CircularChordWheel(
+            currentKey: currentKey,
+            usedChords: usedChords,
+            startingChord: startingChord,
+          ),
+          
+        ],
       ),
-    );
+    ));
   }
 
   Widget _buildLyricsContent() {

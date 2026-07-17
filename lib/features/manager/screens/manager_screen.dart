@@ -433,6 +433,7 @@ E os acordes [G]entre colchetes
               radius: 16,
               backgroundColor: colors.primaryContainer,
               backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+              onBackgroundImageError: photoUrl != null ? (_, __) {} : null,
               child: photoUrl == null
                   ? Text(
                       displayName.isNotEmpty ? displayName.substring(0, 1).toUpperCase() : 'U',

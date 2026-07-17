@@ -30,122 +30,13 @@ class MidiSettingsPanel extends ConsumerWidget {
 
     final activeProfile = state.activeProfile;
 
-    final topBar = isMobile
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.piano, color: colors.primary, size: 28),
-                  const SizedBox(width: 12),
-                  const Text('Controles MIDI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  FilledButton.icon(
-                    onPressed: state.activeOutputId != null ? () => notifier.triggerPanic() : null,
-                    icon: const Icon(Icons.warning_amber_rounded, size: 20),
-                    label: const Text('Panic (Silenciar)', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.orange.shade800,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: colors.surfaceContainerHighest,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
-                            boxShadow: state.inputs.isNotEmpty ? [
-                              BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)
-                            ] : [],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          state.inputs.isNotEmpty ? 'Conectado' : 'Desconectado',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          )
-        : Row(
-            children: [
-              Icon(Icons.piano, color: colors.primary, size: 28),
-              const SizedBox(width: 12),
-              const Text('Controles MIDI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
-              const Spacer(),
-              FilledButton.icon(
-                onPressed: state.activeOutputId != null ? () => notifier.triggerPanic() : null,
-                icon: const Icon(Icons.warning_amber_rounded, size: 20),
-                label: const Text('Panic (Silenciar)', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.orange.shade800,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: colors.surfaceContainerHighest,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
-                        boxShadow: state.inputs.isNotEmpty ? [
-                          BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)
-                        ] : [],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      state.inputs.isNotEmpty ? 'Conectado' : 'Desconectado',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
+    final topBar = Row(
+      children: [
+        Icon(Icons.piano, color: colors.primary, size: 28),
+        const SizedBox(width: 12),
+        const Text('Controles MIDI', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 24)),
+      ],
+    );
 
     final leftColumn = Container(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
@@ -243,6 +134,35 @@ class MidiSettingsPanel extends ConsumerWidget {
             ],
           ),
 
+          if (state.recentEvents.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colors.outline.withOpacity(0.1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.history, size: 14, color: colors.onSurfaceVariant),
+                      const SizedBox(width: 6),
+                      Text('Últimos Sinais Recebidos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colors.onSurfaceVariant)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...state.recentEvents.map((e) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(e, style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: colors.primary)),
+                  )),
+                ],
+              ),
+            ),
+          ],
+
           const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider()),
 
           Row(
@@ -303,6 +223,97 @@ class MidiSettingsPanel extends ConsumerWidget {
               ],
             ],
           ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              icon: const Icon(Icons.clear_all, size: 18),
+              label: const Text('Limpar Mapeamentos deste Perfil', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              style: TextButton.styleFrom(
+                foregroundColor: colors.error,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: colors.error.withOpacity(0.3))),
+              ),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: colors.surfaceContainerHigh,
+                    title: const Text('Limpar Tudo', style: TextStyle(fontWeight: FontWeight.bold)),
+                    content: const Text('Tem certeza que deseja remover TODOS os mapeamentos deste perfil?'),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCELAR')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: colors.error),
+                        onPressed: () {
+                          notifier.clearAllMappings();
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text('LIMPAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: state.activeOutputId != null ? () => notifier.triggerPanic() : null,
+                  icon: const Icon(Icons.warning_amber_rounded, size: 20),
+                  label: const Text('Panic', style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: Colors.orange.shade800,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: colors.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.15) : Colors.red.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: state.inputs.isNotEmpty ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
+                          boxShadow: state.inputs.isNotEmpty ? [
+                            BoxShadow(color: Colors.green.withOpacity(0.5), blurRadius: 4, spreadRadius: 1)
+                          ] : [],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        state.inputs.isNotEmpty ? 'Conectado' : 'Desconectado',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: state.inputs.isNotEmpty ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -324,54 +335,37 @@ class MidiSettingsPanel extends ConsumerWidget {
               Text('Ações Mapeáveis', style: TextStyle(fontWeight: FontWeight.bold, color: colors.primary, fontSize: 20)),
               Text('Clique em MAPEAR e pressione o botão no seu controlador.', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
               const SizedBox(height: 24),
-              
-              _buildSectionTitle('Navegação de Repertório', Icons.library_music, colors),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildMappingRow('Próxima Música', 'next_song', Icons.skip_next, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Música Anterior', 'prev_song', Icons.skip_previous, activeProfile, state, notifier, colors, isMobile),
-                ],
-              ),
-              const SizedBox(height: 24),
+              _buildActionGroup('Navegação de Repertório', Icons.library_music, colors, [
+                _buildMappingRow('Próxima Música', 'next_song', Icons.skip_next, activeProfile, state, notifier, colors),
+                _buildMappingRow('Música Anterior', 'prev_song', Icons.skip_previous, activeProfile, state, notifier, colors),
+              ]),
 
-              _buildSectionTitle('Controle de Rolagem', Icons.swap_vert, colors),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildMappingRow('Iniciar/Pausar Rolagem', 'toggle_scroll', Icons.play_arrow, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Aumentar Velocidade', 'speed_up', Icons.fast_forward, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Diminuir Velocidade', 'speed_down', Icons.fast_rewind, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Página p/ Baixo', 'scroll_down', Icons.arrow_downward, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Página p/ Cima', 'scroll_up', Icons.arrow_upward, activeProfile, state, notifier, colors, isMobile),
-                ],
-              ),
-              const SizedBox(height: 24),
+              _buildActionGroup('Controle de Rolagem', Icons.swap_vert, colors, [
+                _buildMappingRow('Iniciar/Pausar Rolagem', 'toggle_scroll', Icons.play_arrow, activeProfile, state, notifier, colors),
+                _buildMappingRow('Parar Rolagem', 'stop_scroll', Icons.stop, activeProfile, state, notifier, colors),
+                _buildMappingRow('Aumentar Velocidade', 'speed_up', Icons.fast_forward, activeProfile, state, notifier, colors),
+                _buildMappingRow('Diminuir Velocidade', 'speed_down', Icons.fast_rewind, activeProfile, state, notifier, colors),
+                _buildMappingRow('Página p/ Baixo', 'scroll_down', Icons.arrow_downward, activeProfile, state, notifier, colors),
+                _buildMappingRow('Página p/ Cima', 'scroll_up', Icons.arrow_upward, activeProfile, state, notifier, colors),
+              ]),
 
-              _buildSectionTitle('Tonalidade (Transposição)', Icons.music_note, colors),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildMappingRow('Subir Tom (+)', 'tone_up', Icons.arrow_drop_up, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Descer Tom (-)', 'tone_down', Icons.arrow_drop_down, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Resetar Tom (Original)', 'tone_reset', Icons.restore, activeProfile, state, notifier, colors, isMobile),
-                ],
-              ),
-              const SizedBox(height: 24),
+              _buildActionGroup('Tonalidade (Transposição)', Icons.music_note, colors, [
+                _buildMappingRow('Subir Tom (+)', 'tone_up', Icons.arrow_drop_up, activeProfile, state, notifier, colors),
+                _buildMappingRow('Descer Tom (-)', 'tone_down', Icons.arrow_drop_down, activeProfile, state, notifier, colors),
+                _buildMappingRow('Resetar Tom (Original)', 'tone_reset', Icons.restore, activeProfile, state, notifier, colors),
+              ]),
 
-              _buildSectionTitle('Performance & Mixer', Icons.tune, colors),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  _buildMappingRow('Volume Geral', 'volume_master', Icons.volume_up, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Mute (Cortar Som)', 'mute_toggle', Icons.volume_off, activeProfile, state, notifier, colors, isMobile),
-                  _buildMappingRow('Trocar Timbre', 'patch_change', Icons.piano, activeProfile, state, notifier, colors, isMobile),
-                ],
-              ),
+              _buildActionGroup('Performance & Mixer', Icons.tune, colors, [
+                _buildMappingRow('Volume Geral', 'volume_master', Icons.volume_up, activeProfile, state, notifier, colors),
+                _buildMappingRow('Mute (Cortar Som)', 'mute_toggle', Icons.volume_off, activeProfile, state, notifier, colors),
+                _buildMappingRow('Trocar Timbre', 'patch_change', Icons.piano, activeProfile, state, notifier, colors),
+                _buildMappingRow('Panic (Silenciar Tudo)', 'panic', Icons.warning_amber, activeProfile, state, notifier, colors),
+              ]),
+
+              _buildActionGroup('Metrônomo e Ritmo', Icons.timer, colors, [
+                _buildMappingRow('Ligar/Desligar Metrônomo', 'metronome_toggle', Icons.play_arrow, activeProfile, state, notifier, colors),
+                _buildMappingRow('Tap Tempo', 'tap_tempo', Icons.touch_app, activeProfile, state, notifier, colors),
+              ]),
             ],
           ),
         ),
@@ -380,35 +374,37 @@ class MidiSettingsPanel extends ConsumerWidget {
 
     return Padding(
       padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          topBar,
-          SizedBox(height: isMobile ? 16 : 32),
-          
-          Expanded(
-            child: isMobile
-                ? SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        leftColumn,
-                        const SizedBox(height: 24),
-                        rightColumn,
-                      ],
-                    ),
-                  )
-                : Row(
+      child: isMobile
+          ? SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  topBar,
+                  const SizedBox(height: 16),
+                  leftColumn,
+                  const SizedBox(height: 24),
+                  rightColumn,
+                ],
+              ),
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(flex: 4, child: leftColumn),
-                      const SizedBox(width: 32),
-                      Expanded(flex: 6, child: rightColumn),
+                      topBar,
+                      const SizedBox(height: 32),
+                      leftColumn,
                     ],
                   ),
-          ),
-        ],
-      ),
+                ),
+                const SizedBox(width: 32),
+                Expanded(flex: 6, child: rightColumn),
+              ],
+            ),
     );
   }
 
@@ -444,32 +440,83 @@ class MidiSettingsPanel extends ConsumerWidget {
     );
   }
 
-  Widget _buildSectionTitle(String title, IconData icon, ColorScheme colors) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: colors.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: colors.onPrimaryContainer),
+  Widget _buildActionGroup(
+    String title,
+    IconData icon,
+    ColorScheme colors,
+    List<Widget> children,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: colors.primary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: colors.surfaceContainer,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.outline.withOpacity(0.15)),
           ),
-          const SizedBox(width: 16),
-          Expanded(child: Divider(color: colors.outline.withOpacity(0.2))),
-        ],
-      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 500;
+              if (!isWide) {
+                return Column(
+                  children: [
+                    for (int i = 0; i < children.length; i++) ...[
+                      children[i],
+                      if (i < children.length - 1)
+                        Divider(height: 1, color: colors.outline.withOpacity(0.1)),
+                    ]
+                  ],
+                );
+              }
+
+              final rows = <Widget>[];
+              for (int i = 0; i < children.length; i += 2) {
+                final isLastRow = (i + 2 >= children.length);
+                if (i + 1 < children.length) {
+                  rows.add(
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: children[i]),
+                          VerticalDivider(width: 1, thickness: 1, color: colors.outline.withOpacity(0.1)),
+                          Expanded(child: children[i + 1]),
+                        ],
+                      ),
+                    ),
+                  );
+                } else {
+                  rows.add(children[i]);
+                }
+                
+                if (!isLastRow) {
+                  rows.add(Divider(height: 1, thickness: 1, color: colors.outline.withOpacity(0.1)));
+                }
+              }
+              return Column(children: rows);
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 
@@ -481,7 +528,6 @@ class MidiSettingsPanel extends ConsumerWidget {
     MidiState state,
     MidiNotifier notifier,
     ColorScheme colors,
-    bool isMobile,
   ) {
     final mapping = activeProfile.mappings[actionKey];
     final isLearningThis = state.isLearning && state.learningAction == actionKey;
@@ -493,90 +539,88 @@ class MidiSettingsPanel extends ConsumerWidget {
       mappingText = 'Sinal ${mapping.command} • N/CC ${mapping.noteOrCc}';
     }
 
-    return Container(
-      width: isMobile ? double.infinity : 280,
-      decoration: BoxDecoration(
-        color: isLearningThis ? colors.primaryContainer.withOpacity(0.3) : colors.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isLearningThis ? colors.primary : colors.outline.withOpacity(0.15),
-          width: isLearningThis ? 2.0 : 1.0,
-        ),
-      ),
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: isLearningThis ? colors.primary : colors.onSurfaceVariant),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: isLearningThis ? colors.primary : colors.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+    return InkWell(
+      onTap: () { if (!isLearningThis) notifier.startLearning(actionKey); },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isLearningThis ? colors.primaryContainer : colors.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isLearningThis ? colors.primary.withOpacity(0.1) : colors.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    mappingText,
+              child: Icon(icon, size: 20, color: isLearningThis ? colors.onPrimaryContainer : colors.onSurfaceVariant),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: mapping != null ? FontWeight.bold : FontWeight.normal,
-                      color: isLearningThis 
-                          ? colors.primary 
-                          : mapping != null ? colors.onSurface : colors.onSurfaceVariant,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: isLearningThis ? colors.primary : colors.onSurface,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Text(
+                    mappingText,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: mapping != null ? FontWeight.bold : FontWeight.normal,
+                      color: isLearningThis ? colors.primary : (mapping != null ? colors.onSurface : colors.onSurfaceVariant),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              if (isLearningThis)
-                FilledButton.tonal(
-                  onPressed: () => notifier.cancelLearning(),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.errorContainer,
-                    foregroundColor: colors.onErrorContainer,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    minimumSize: const Size(60, 32),
-                  ),
-                  child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-                )
-              else
-                OutlinedButton(
-                  onPressed: () => notifier.startLearning(actionKey),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: mapping != null ? colors.primary.withOpacity(0.5) : colors.outline),
-                    foregroundColor: mapping != null ? colors.primary : colors.onSurface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    minimumSize: const Size(60, 32),
-                  ),
-                  child: Text(mapping != null ? 'REMAPEAR' : 'MAPEAR', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            ),
+            const SizedBox(width: 12),
+            if (isLearningThis)
+              FilledButton.tonal(
+                onPressed: () => notifier.cancelLearning(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: colors.errorContainer,
+                  foregroundColor: colors.onErrorContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(50, 32),
                 ),
-            ],
-          ),
-        ],
+                child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+              )
+            else
+              OutlinedButton(
+                onPressed: () => notifier.startLearning(actionKey),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: mapping != null ? colors.primary.withOpacity(0.5) : colors.outline),
+                  foregroundColor: mapping != null ? colors.primary : colors.onSurface,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(50, 32),
+                ),
+                child: Text(mapping != null ? 'REMAPEAR' : 'MAPEAR', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+              ),
+            if (mapping != null) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                color: colors.error,
+                tooltip: 'Remover Mapeamento',
+                onPressed: () {
+                   notifier.removeMapping(actionKey);
+                },
+              ),
+            ]
+          ],
+        ),
       ),
     );
   }

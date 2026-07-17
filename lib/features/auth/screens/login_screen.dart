@@ -20,11 +20,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final googleProvider = GoogleAuthProvider();
       // On Web/Chrome, signInWithPopup works natively and immediately
       await FirebaseAuth.instance.signInWithPopup(googleProvider);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'popup-closed-by-user') {
+        // Ignorar se o usuário fechou o popup intencionalmente
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro no login com Google: ${e.message ?? e.code}'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro no login com Google: $e'),
+            content: Text('Erro inesperado no login: $e'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
@@ -82,7 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 400),
-                    padding: const EdgeInsets.all(48),
+                    padding: EdgeInsets.all(size.width < 400 ? 32 : 48),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.04),
                       borderRadius: BorderRadius.circular(32),
@@ -184,13 +198,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ),
                                       const SizedBox(width: 12),
                                       Flexible(
-                                        child: Text(
-                                          'Continuar com o Google',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
+                                        child: FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            'Continuar com o Google',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],

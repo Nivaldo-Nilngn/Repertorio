@@ -195,6 +195,87 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     );
   }
 
+  void _showEditSetlistDialog(SongSetlist setlist) {
+    final nameController = TextEditingController(text: setlist.name);
+    final dateController = TextEditingController(text: setlist.date);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              title: const Text('Editar Repertório'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(labelText: 'Nome do Repertório'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: dateController,
+                    readOnly: true,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2030),
+                      );
+                      if (picked != null) {
+                        final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        dateController.text = "${picked.day} ${months[picked.month - 1]}, ${picked.year}";
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Data / Evento',
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('CANCELAR'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    final date = dateController.text.trim();
+                    if (name.isEmpty) return;
+
+                    final updatedSetlist = setlist.copyWith(name: name, date: date);
+                    
+                    if (_activeSetlist?.id == setlist.id) {
+                      setState(() {
+                        _activeSetlist = updatedSetlist;
+                        _isDirty = true;
+                      });
+                    } else {
+                       ref.read(songRepositoryProvider).updateSetlist(updatedSetlist);
+                    }
+                    
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Repertório "$name" atualizado!'), backgroundColor: Colors.green),
+                      );
+                    }
+                  },
+                  child: const Text('SALVAR'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _addSongToSetlist(Song song) {
     if (_activeSetlist == null) return;
 
@@ -536,28 +617,91 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                setlist.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
-                                  const SizedBox(width: 4),
                                   Expanded(
-                                    child: Text(
-                                      setlist.date,
-                                      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          setlist.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18,
+                                            color: Colors.white,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                setlist.date,
+                                                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    icon: Icon(Icons.more_vert, size: 20, color: colors.onSurfaceVariant),
+                                    tooltip: 'Opções do Repertório',
+                                    color: colors.surfaceContainerHigh,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    onSelected: (value) async {
+                                      if (value == 'edit') {
+                                        _showEditSetlistDialog(setlist);
+                                      } else if (value == 'delete') {
+                                        final confirm = await showDialog<bool>(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            backgroundColor: colors.surface,
+                                            title: const Text('Excluir Repertório'),
+                                            content: Text('Tem certeza que deseja excluir "${setlist.name}"?'),
+                                            actions: [
+                                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCELAR')),
+                                              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('EXCLUIR'), style: FilledButton.styleFrom(backgroundColor: Colors.red)),
+                                            ],
+                                          ),
+                                        );
+
+                                        if (confirm == true) {
+                                          await ref.read(songRepositoryProvider).deleteSetlist(setlist.id);
+                                        }
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit_outlined, size: 18, color: colors.onSurface),
+                                            const SizedBox(width: 12),
+                                            Text('Editar', style: TextStyle(color: colors.onSurface)),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                                            const SizedBox(width: 12),
+                                            const Text('Excluir', style: TextStyle(color: Colors.redAccent)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -583,43 +727,17 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                               ),
 
                               const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _activeSetlist = setlist;
-                                          _isDirty = false;
-                                        });
-                                      },
-                                      child: const Text('Organizar Roteiro', style: TextStyle(fontSize: 12)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, size: 20),
-                                    color: Colors.redAccent.withOpacity(0.8),
-                                    onPressed: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (context) => AlertDialog(
-                                          backgroundColor: colors.surface,
-                                          title: const Text('Excluir Repertório'),
-                                          content: Text('Tem certeza que deseja excluir "${setlist.name}"?'),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCELAR')),
-                                            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('EXCLUIR'), style: FilledButton.styleFrom(backgroundColor: Colors.red)),
-                                          ],
-                                        ),
-                                      );
-
-                                      if (confirm == true) {
-                                        await ref.read(songRepositoryProvider).deleteSetlist(setlist.id);
-                                      }
-                                    },
-                                  ),
-                                ],
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _activeSetlist = setlist;
+                                      _isDirty = false;
+                                    });
+                                  },
+                                  child: const Text('Organizar Roteiro', style: TextStyle(fontSize: 12)),
+                                ),
                               ),
                             ],
                           ),
@@ -887,10 +1005,20 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   }),
                 ),
                 Expanded(
-                  child: Text(
-                    _activeSetlist!.name,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _activeSetlist!.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 18),
+                        onPressed: () => _showEditSetlistDialog(_activeSetlist!),
+                      ),
+                    ],
                   ),
                 ),
                 if (_isDirty)
@@ -1279,7 +1407,18 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(_activeSetlist!.name, style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 32)),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(_activeSetlist!.name, style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 32)),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 22),
+                            onPressed: () => _showEditSetlistDialog(_activeSetlist!),
+                            tooltip: 'Editar Repertório',
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       Row(
                         children: [

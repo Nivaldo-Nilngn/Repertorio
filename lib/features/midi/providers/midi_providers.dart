@@ -35,6 +35,8 @@ class MidiState {
   final bool isLearning;
   final String? learningAction;
 
+  final List<String> recentEvents;
+
   MidiState({
     this.isSupported = false,
     this.inputs = const [],
@@ -47,6 +49,7 @@ class MidiState {
     this.activeProfileId = 'default',
     this.isLearning = false,
     this.learningAction,
+    this.recentEvents = const [],
   });
 
   MidiProfile get activeProfile =>
@@ -64,6 +67,7 @@ class MidiState {
     String? activeProfileId,
     bool? isLearning,
     String? learningAction,
+    List<String>? recentEvents,
   }) {
     return MidiState(
       isSupported: isSupported ?? this.isSupported,
@@ -77,6 +81,7 @@ class MidiState {
       activeProfileId: activeProfileId ?? this.activeProfileId,
       isLearning: isLearning ?? this.isLearning,
       learningAction: learningAction ?? this.learningAction,
+      recentEvents: recentEvents ?? this.recentEvents,
     );
   }
 }
@@ -219,26 +224,57 @@ class MidiNotifier extends Notifier<MidiState> {
     state = state.copyWith(isLearning: false, learningAction: null);
   }
 
+  void removeMapping(String actionKey) {
+    final profile = state.activeProfile;
+    final updatedMappings = Map<String, MidiCommand>.from(profile.mappings);
+    updatedMappings.remove(actionKey);
+    
+    final updatedProfile = profile.copyWith(mappings: updatedMappings);
+    final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
+    
+    state = state.copyWith(profiles: updatedProfiles);
+    _storage.saveProfiles(updatedProfiles);
+  }
+
+  void clearAllMappings() {
+    final profile = state.activeProfile;
+    final updatedProfile = profile.copyWith(mappings: const {});
+    final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
+    
+    state = state.copyWith(profiles: updatedProfiles);
+    _storage.saveProfiles(updatedProfiles);
+  }
+
   void _onMidiMessage(MidiMessageEvent event) {
     // Only process from active input device if one is selected
     if (state.activeInputId != null && event.portId != state.activeInputId) {
       return;
     }
 
-    // Flash the LED
+    final cmd = MidiCommand(command: event.command, noteOrCc: event.note);
+
+    // Add to recent events log
+    final nowTime = DateTime.now();
+    final timeStr = "${nowTime.hour.toString().padLeft(2, '0')}:${nowTime.minute.toString().padLeft(2, '0')}:${nowTime.second.toString().padLeft(2, '0')}";
+    final eventStr = "[$timeStr] Sinal ${cmd.command} (N/CC: ${cmd.noteOrCc})";
+    
+    final newEvents = [eventStr, ...state.recentEvents];
+    if (newEvents.length > 5) newEvents.removeLast();
+
+    // Flash the LED and update log
     if (!state.isReceivingSignal) {
-      state = state.copyWith(isReceivingSignal: true);
+      state = state.copyWith(isReceivingSignal: true, recentEvents: newEvents);
       Future.delayed(const Duration(milliseconds: 150), () {
         try {
           state = state.copyWith(isReceivingSignal: false);
         } catch (_) {}
       });
+    } else {
+      state = state.copyWith(recentEvents: newEvents);
     }
 
-    // Ignore Note Off
+    // Ignore Note Off for mapping and execution
     if (event.isNoteOff) return;
-
-    final cmd = MidiCommand(command: event.command, noteOrCc: event.note);
 
     if (state.isLearning && state.learningAction != null) {
       // Check for conflicts
