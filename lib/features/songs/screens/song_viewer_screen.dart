@@ -730,21 +730,15 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                       _buildFloatingTile(
                         _videoState == VideoDisplayState.full
                             ? Icons.ondemand_video
-                            : _videoState == VideoDisplayState.mini
-                                ? Icons.audio_file
-                                : Icons.videocam_off,
+                            : Icons.videocam_off,
                         _videoState == VideoDisplayState.full
                             ? 'Vídeo'
-                            : _videoState == VideoDisplayState.mini
-                                ? 'Mini'
-                                : 'Oculto',
+                            : 'Oculto',
                         () {
                           setState(() {
                             _videoState = _videoState == VideoDisplayState.full
-                                ? VideoDisplayState.mini
-                                : _videoState == VideoDisplayState.mini
-                                    ? VideoDisplayState.hidden
-                                    : VideoDisplayState.full;
+                                ? VideoDisplayState.hidden
+                                : VideoDisplayState.full;
                           });
                         },
                         colors,
@@ -878,13 +872,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                               ),
                             ),
                     ),
-                  // ── Mini player UI overlay (shown on top when in mini mode) ──
-                  if (_parsedSong.video.isNotEmpty && _videoState == VideoDisplayState.mini)
-                    Positioned(
-                      top: 12,
-                      right: _showChordsPanel ? 320 : 12,
-                      child: _buildMiniVideoController(),
-                    ),
+                  // Mini player removido
                   // Floating auto-scroll speed control
                   if (_isAutoScrolling)
                     Positioned(
@@ -1099,21 +1087,15 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   _buildSidebarTile(
                     icon: _videoState == VideoDisplayState.full
                         ? Icons.ondemand_video
-                        : _videoState == VideoDisplayState.mini
-                            ? Icons.audio_file
-                            : Icons.videocam_off,
+                        : Icons.videocam_off,
                     label: _videoState == VideoDisplayState.full
                         ? 'Vídeo'
-                        : _videoState == VideoDisplayState.mini
-                            ? 'Mini'
-                            : 'Oculto',
+                        : 'Oculto',
                     onTap: () {
                       setState(() {
                         _videoState = _videoState == VideoDisplayState.full
-                            ? VideoDisplayState.mini
-                            : _videoState == VideoDisplayState.mini
-                                ? VideoDisplayState.hidden
-                                : VideoDisplayState.full;
+                            ? VideoDisplayState.hidden
+                            : VideoDisplayState.full;
                       });
                     },
                     isActive: _videoState != VideoDisplayState.hidden,

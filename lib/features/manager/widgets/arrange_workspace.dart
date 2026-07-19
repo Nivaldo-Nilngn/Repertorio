@@ -1136,6 +1136,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   ),
                 )
               : ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
                   itemCount: _activeSetlist!.items.length,
                   onReorder: (oldIndex, newIndex) {
@@ -1487,6 +1488,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                   ),
                 )
               : ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
                   padding: const EdgeInsets.all(24),
                   itemCount: _activeSetlist!.items.length,
                   onReorder: (oldIndex, newIndex) {

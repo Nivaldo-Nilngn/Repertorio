@@ -94,9 +94,9 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
         _currentChordPro = initialText;
         try {
           final matchingSong = ref.read(songListProvider).value?.firstWhere((s) => s.content == initialText);
-          _selectedFolderId = matchingSong?.folderId;
+          _selectedFolderId = matchingSong?.folderId ?? ref.read(songFilterProvider).folderId;
         } catch (_) {
-          _selectedFolderId = null;
+          _selectedFolderId = ref.read(songFilterProvider).folderId;
         }
       });
     });
@@ -221,6 +221,10 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
         );
         ref.read(selectedSongIdProvider.notifier).select(song.id);
         ref.read(isEditorVisibleProvider.notifier).state = false;
+        
+        if (_selectedFolderId != null) {
+          ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.prepare);
+        }
       }
     } catch (e) {
       if (mounted) {
