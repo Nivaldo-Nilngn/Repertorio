@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
+import 'package:google_fonts/google_fonts.dart';
 import '../models/song.dart';
 
 import '../widgets/chord_api_viewer.dart';
@@ -804,6 +805,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (widget.hideAppBar) _buildDesktopHeader(),
+                              if (widget.isPreviewMode) _buildPreviewModeToggle(),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1643,6 +1645,36 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     );
   }
 
+  Widget _buildPreviewModeToggle() {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24.0),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: SegmentedButton<SongViewMode>(
+          segments: const [
+            ButtonSegment(value: SongViewMode.harmonic, label: Text('Roda'), icon: Icon(Icons.donut_large, size: 18)),
+            ButtonSegment(value: SongViewMode.roadmap, label: Text('Mapa'), icon: Icon(Icons.grid_view, size: 18)),
+            ButtonSegment(value: SongViewMode.lyrics, label: Text('Cifra'), icon: Icon(Icons.notes, size: 18)),
+          ],
+          selected: {_viewMode},
+          onSelectionChanged: (Set<SongViewMode> newSelection) {
+            setState(() {
+              _viewMode = newSelection.first;
+            });
+            ref.read(settingsProvider.notifier).setViewMode(_viewMode.toString().split('.').last);
+          },
+          style: SegmentedButton.styleFrom(
+            backgroundColor: colors.surfaceContainerHighest.withOpacity(0.3),
+            selectedBackgroundColor: colors.primaryContainer,
+            selectedForegroundColor: colors.onPrimaryContainer,
+            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFloatingVideoPlayer() {
     return Material(
       elevation: 8,
@@ -2017,7 +2049,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           maxLines: 1,
           softWrap: false,
           style: TextStyle(
-            fontFamily: 'Consolas',
+            fontFamily: GoogleFonts.robotoMono().fontFamily,
             fontSize: _fontSize.value - 6.0,
             fontWeight: FontWeight.bold,
             color: _getChordColor(),
@@ -2227,7 +2259,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             transposedChords,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontFamily: 'Consolas',
+              fontFamily: GoogleFonts.robotoMono().fontFamily,
               fontSize: _fontSize.value - 3.0,
               fontWeight: FontWeight.bold,
               color: _getChordColor(),
@@ -2362,19 +2394,39 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       }
       
       final firstRow = section.rows.first;
+      // Collect all unique chords from all rows for a complete section preview
       List<String> flatChords = [];
-      for (var measure in firstRow.measures) {
-        for (var c in measure) {
-          if (flatChords.length < 8) {
-            flatChords.add(ChordTransposer.transpose(c, _transposeSteps.value));
+      String? firstHint;
+      for (int i = 0; i < section.rows.length; i++) {
+        var row = section.rows[i];
+        firstHint ??= row.hint;
+        
+        if (i > 0 && row.measures.isNotEmpty) {
+          flatChords.add('-');
+        }
+        
+        if (i > 0 && row.hint != null) {
+          flatChords.add('HINT:${row.hint}');
+        }
+        
+        for (var measure in row.measures) {
+          for (var c in measure) {
+            final transposed = ChordTransposer.transpose(c, _transposeSteps.value);
+            flatChords.add(transposed);
           }
+        }
+        
+        if (section.rows.length > 1 && row.repetition != null) {
+          flatChords.add('REP:${row.repetition}');
         }
       }
       
       String chordSeq = flatChords.join(',');
       
-      // 1. Tentar mesclar seções que possuem EXATAMENTE os mesmos acordes
-      int existingIndex = previewSections.indexWhere((sec) => sec['chords'].join(',') == chordSeq);
+      // 1. Tentar mesclar seções que possuem EXATAMENTE os mesmos acordes e repetições
+      int existingIndex = previewSections.indexWhere((sec) => 
+          sec['chords'].join(',') == chordSeq && 
+          sec['repetition'] == firstRow.repetition);
       if (existingIndex != -1) {
         String oldRawTitle = previewSections[existingIndex]['rawTitle'];
         if (!oldRawTitle.toUpperCase().contains(baseNew)) {
@@ -2405,7 +2457,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
            
            // Se a primeira não tinha letra, mas essa tem, aproveita a letra
            String oldLyrics = previewSections[existingIndex]['lyrics'];
-           String newLyrics = firstRow.hint ?? "";
+           String newLyrics = firstHint ?? "";
            if (oldLyrics.isEmpty && newLyrics.isNotEmpty) {
              previewSections[existingIndex]['lyrics'] = newLyrics;
            }
@@ -2429,7 +2481,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         'rawTitle': section.title,
         'repetition': firstRow.repetition,
         'title': displayTitle,
-        'lyrics': firstRow.hint ?? "",
+        'lyrics': firstHint ?? "",
         'chords': flatChords,
       });
       
@@ -2492,6 +2544,47 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                             spacing: 6,
                             runSpacing: 6,
                             children: chords.map((c) {
+                              if (c == '-') {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 6.0),
+                                  child: Text(
+                                    '-',
+                                    style: TextStyle(
+                                      fontSize: _fontSize.value - 2.0,
+                                      color: colors.onSurfaceVariant.withOpacity(0.5),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (c.startsWith('REP:')) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(left: 2.0, right: 4.0, top: 4.0),
+                                  child: Text(
+                                    c.substring(4),
+                                    style: TextStyle(
+                                      fontSize: _fontSize.value - 2.0,
+                                      color: colors.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (c.startsWith('HINT:')) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+                                  child: Text(
+                                    c.substring(5),
+                                    style: TextStyle(
+                                      color: _getLyricColor().withOpacity(0.9),
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: _fontSize.value - 3.0,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                );
+                              }
+                              
                               final degree = getDegree(c);
                               Color fnColor = colors.primary;
                               if (degree != null) {
@@ -2596,7 +2689,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         child: Text(
           line.lyrics,
           style: TextStyle(
-            fontFamily: 'Consolas',
+            fontFamily: GoogleFonts.robotoMono().fontFamily,
             fontSize: _fontSize.value,
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurfaceVariant,
@@ -2611,7 +2704,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         child: Text(
           line.lyrics.isEmpty ? ' ' : line.lyrics,
           style: TextStyle(
-            fontFamily: 'Consolas',
+            fontFamily: GoogleFonts.robotoMono().fontFamily,
             fontSize: _fontSize.value,
             color: colorScheme.onSurface,
           ),
@@ -2638,7 +2731,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               Text(
                 sectionLabel,
                 style: TextStyle(
-                  fontFamily: 'Consolas',
+                  fontFamily: GoogleFonts.robotoMono().fontFamily,
                   fontSize: _fontSize.value,
                   fontWeight: FontWeight.bold,
                   color: colorScheme.onSurfaceVariant,
@@ -2647,7 +2740,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             Text(
               chordsString,
               style: TextStyle(
-                fontFamily: 'Consolas',
+                fontFamily: GoogleFonts.robotoMono().fontFamily,
                 fontSize: _fontSize.value,
                 fontWeight: FontWeight.bold,
                 color: colorScheme.primary,
@@ -2745,7 +2838,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           Text(
             chordsString,
             style: TextStyle(
-              fontFamily: 'Consolas',
+              fontFamily: GoogleFonts.robotoMono().fontFamily,
               fontSize: _fontSize.value,
               fontWeight: FontWeight.bold,
               color: colorScheme.primary,
@@ -2754,7 +2847,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           Text(
             lyricsString,
             style: TextStyle(
-              fontFamily: 'Consolas',
+              fontFamily: GoogleFonts.robotoMono().fontFamily,
               fontSize: _fontSize.value,
               color: colorScheme.onSurface,
             ),

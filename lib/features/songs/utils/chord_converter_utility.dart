@@ -1,6 +1,6 @@
 class ChordConverterUtility {
   static final _chordRegex = RegExp(
-    r'^([A-G][#b]?)(m|min|maj|M)?(dim|aug|\+|-)?(2|4|5|6|7|9|11|13)?(\/[A-G][#b]?)?$',
+    r'^([A-G][#b]?)(m|min|maj|M|sus|sus2|sus4)?(dim|aug|\+|-|º|°)?(2|4|5|6|7|9|11|13)?(\([^)]+\))?(\/[A-G][#b]?)?$',
   );
 
   /// Checks if a string token is a valid chord.

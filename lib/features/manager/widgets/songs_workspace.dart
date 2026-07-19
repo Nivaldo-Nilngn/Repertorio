@@ -11,6 +11,7 @@ import '../../songs/utils/chord_converter.dart';
 import '../../songs/services/cifra_club_parser.dart';
 import '../../songs/utils/chord_pro_parser.dart';
 import '../../songs/utils/chord_transposer.dart';
+import '../../songs/utils/harmonic_field_calculator.dart';
 import '../../songs/utils/chord_converter_utility.dart';
 import 'cifraclub_importer.dart';
 
@@ -75,7 +76,6 @@ class ChordProTextController extends TextEditingController {
       'fim',
       'outro',
       'obs',
-      'compasso',
       'verso',
     ];
 
@@ -173,6 +173,8 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
   ChordFormat _format = ChordFormat.traditional;
 
   bool _isProcessingInternalChange = false;
+  bool _isSimplified = false;
+  String? _originalContent;
 
   void _showImportDialog(BuildContext context) {
     final TextEditingController importController = TextEditingController();
@@ -395,9 +397,12 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
               .read(songListProvider)
               .value
               ?.firstWhere((s) => s.content == initialText);
-          _selectedFolderId = matchingSong?.folderId;
+          // Only override folder if we found a matching saved song
+          if (matchingSong != null) {
+            _selectedFolderId = matchingSong.folderId;
+          }
         } catch (_) {
-          _selectedFolderId = null;
+          // No matching song found - keep current _selectedFolderId
         }
       });
     });
@@ -689,6 +694,55 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
     });
   }
 
+  
+  void _simplifyChords() {
+    if (_isSimplified) {
+      if (_originalContent != null) {
+        setState(() {
+          _contentController.text = _originalContent!;
+          _isSimplified = false;
+        });
+        _onFieldChanged();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Acordes originais restaurados.'), backgroundColor: Colors.blue),
+        );
+      }
+    } else {
+      _originalContent = _contentController.text;
+      final contentText = _contentController.text;
+      final regex = RegExp(r'\[(.*?)\]');
+      final newContent = contentText.replaceAllMapped(regex, (match) {
+        final chord = match.group(1)!;
+        final lower = chord.toLowerCase();
+        if (lower.contains('parte') || 
+            lower.contains('refrão') || 
+            lower.contains('refrao') || 
+            lower.contains('intro') || 
+            lower.contains('ponte') || 
+            lower.contains('solo') || 
+            lower.contains('final') || 
+            lower.contains('interl') ||
+            lower.contains('ministra')) {
+          return '[$chord]';
+        }
+        final simplified = HarmonicFieldCalculator.extractRootChord(chord);
+        return '[$simplified]';
+      });
+      setState(() {
+        _contentController.text = newContent;
+        _isSimplified = true;
+      });
+      _onFieldChanged();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Modo Simplificado. Aviso: Desativar restaurará o texto original, perdendo edições.'), 
+          duration: Duration(seconds: 4),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
   Widget _buildToolbarButton(String label, String textToInsert) {
     final colors = Theme.of(context).colorScheme;
     return OutlinedButton(
@@ -722,7 +776,7 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
                 borderRadius: BorderRadius.circular(16),
               ),
               title: Text(
-                'Importar do Cifra Club',
+                'Importar de Link',
                 style: TextStyle(
                   color: colors.onSurface,
                   fontWeight: FontWeight.bold,
@@ -732,7 +786,7 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Cole a URL do Cifra Club abaixo para converter magicamente!',
+                    'Cole a URL de um site suportado abaixo para converter magicamente!',
                     style: TextStyle(color: colors.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
@@ -740,7 +794,7 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
                     controller: urlController,
                     style: TextStyle(color: colors.onSurface),
                     decoration: InputDecoration(
-                      hintText: 'https://www.cifraclub.com.br/...',
+                      hintText: 'https://...',
                       hintStyle: TextStyle(
                         color: colors.onSurfaceVariant.withOpacity(0.5),
                       ),
@@ -996,9 +1050,12 @@ E os acordes [G]entre colchetes
                 .read(songListProvider)
                 .value
                 ?.firstWhere((s) => s.content == next);
-            _selectedFolderId = matchingSong?.folderId;
+            // Only override folder if we found a matching saved song
+            if (matchingSong != null) {
+              _selectedFolderId = matchingSong.folderId;
+            }
           } catch (_) {
-            _selectedFolderId = null;
+            // No matching song found - keep current _selectedFolderId
           }
         });
       }
@@ -1863,9 +1920,12 @@ E os acordes [G]entre colchetes
                     ),
                   ),
                   const SizedBox(height: 12),
-                  InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Tom Original',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Tom Original',
                       labelStyle: TextStyle(
                         color: Colors.white54,
                         fontSize: 13,
@@ -1940,6 +2000,21 @@ E os acordes [G]entre colchetes
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Simplificar Acordes',
+                  child: IconButton.filledTonal(
+                    onPressed: _simplifyChords,
+                    icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
+                        foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                      ),
+                  ),
+                ),
+              ],
+            ),
                   const SizedBox(height: 16),
                   // Toolbar
                   SingleChildScrollView(
@@ -1965,8 +2040,7 @@ E os acordes [G]entre colchetes
                         _buildToolbarButton('Ponte', '[Ponte]\n'),
                         const SizedBox(width: 6),
                         _buildToolbarButton('OBS', 'OBS: '),
-                        const SizedBox(width: 6),
-                        _buildToolbarButton('Compasso ( | )', ' | '),
+
                       ],
                     ),
                   ),
@@ -2510,7 +2584,7 @@ E os acordes [G]entre colchetes
                             TextButton.icon(
                               onPressed: _saveToFirebase,
                               icon: const Icon(Icons.cloud_upload, size: 16),
-                              label: const Text('SALVAR NO DB'),
+                              label: const Text('SALVAR MÚSICA'),
                             ),
                           ],
                         ),
@@ -2757,6 +2831,22 @@ E os acordes [G]entre colchetes
                                   ),
                                 ),
                               ),
+                              const SizedBox(width: 16),
+                              SizedBox(
+                                height: 56,
+                                child: FilledButton.icon(
+                                  onPressed: _simplifyChords,
+                                icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
+                                label: const Text('Simplificar'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
+                                  foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  elevation: 0,
+                                ),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 20),
@@ -2796,11 +2886,7 @@ E os acordes [G]entre colchetes
                                       _buildToolbarButton('Ponte', '[Ponte]\n'),
                                       const SizedBox(width: 8),
                                       _buildToolbarButton('OBS', 'OBS: '),
-                                      const SizedBox(width: 8),
-                                      _buildToolbarButton(
-                                        'Compasso ( | )',
-                                        ' | ',
-                                      ),
+
                                     ],
                                   ),
                                 ),

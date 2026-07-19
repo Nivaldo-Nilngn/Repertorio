@@ -103,7 +103,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Cifra Club (Mágica)',
+                              'Sites suportados',
                               style: TextStyle(color: colors.primary.withOpacity(0.7), fontSize: 12),
                               textAlign: TextAlign.center,
                             ),
@@ -188,16 +188,16 @@ E os acordes [G]entre colchetes
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Theme.of(context).colorScheme.surface,
-              title: const Text('Importar do Cifra Club'),
+              title: const Text('Importar de Link'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Cole a URL do Cifra Club abaixo para converter magicamente!'),
+                  const Text('Cole a URL de um site suportado abaixo para converter magicamente!'),
                   const SizedBox(height: 16),
                   TextField(
                     controller: urlController,
                     decoration: InputDecoration(
-                      hintText: 'https://www.cifraclub.com.br/...',
+                      hintText: 'https://...',
                       border: const OutlineInputBorder(),
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surfaceContainer,

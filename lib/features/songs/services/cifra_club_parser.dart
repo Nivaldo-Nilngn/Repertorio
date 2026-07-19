@@ -3,14 +3,15 @@ import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 import 'package:musicifras/features/songs/utils/chord_transposer.dart';
+import 'package:musicifras/features/songs/services/banana_cifras_parser.dart';
 
 class CifraClubParser {
   // Troque pela URL do seu worker após o deploy (ex: https://cifra-proxy.SEU_SUBDOMINIO.workers.dev)
   static const String _proxyBaseUrl = 'https://cifra-proxy.nivaldo-nilngn.workers.dev';
 
   static Future<String> fetchAndParse(String url) async {
-    if (!url.toLowerCase().contains('cifraclub')) {
-      throw Exception('A URL informada não pertence ao Cifra Club. Por favor, cole um link válido.');
+    if (!url.toLowerCase().contains('cifraclub') && !url.toLowerCase().contains('bananacifras')) {
+      throw Exception('A URL informada não é suportada. Por favor, cole um link válido do Cifra Club ou Banana Cifras.');
     }
 
     int? targetKeyIndex;
@@ -27,11 +28,14 @@ class CifraClubParser {
       final response = await http.get(Uri.parse(proxyUrl));
       if (response.statusCode == 200) {
         final htmlContent = response.body;
+        if (url.toLowerCase().contains('bananacifras')) {
+          return await BananaCifrasParser.parseHtmlToChordPro(htmlContent, targetKeyIndex: targetKeyIndex);
+        }
         return parseHtmlToChordPro(htmlContent, targetKeyIndex: targetKeyIndex);
       }
       throw Exception('Failed to fetch page');
     } catch (e) {
-      throw Exception('Error parsing Cifra Club: $e');
+      throw Exception('Error parsing URL: $e');
     }
   }
 

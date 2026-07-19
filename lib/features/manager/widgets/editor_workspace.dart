@@ -11,6 +11,7 @@ import '../../songs/utils/chord_converter.dart';
 import '../../songs/services/cifra_club_parser.dart';
 import '../../songs/utils/chord_pro_parser.dart';
 import '../../songs/utils/chord_transposer.dart';
+import '../../songs/utils/harmonic_field_calculator.dart';
 
 enum ChordFormat { chordPro, text }
 
@@ -80,6 +81,8 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
   ChordFormat _format = ChordFormat.chordPro;
   
   bool _isProcessingInternalChange = false;
+  bool _isSimplified = false;
+  String? _originalContent;
 
   @override
   void initState() {
@@ -272,6 +275,55 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
     });
   }
 
+  
+  void _simplifyChords() {
+    if (_isSimplified) {
+      if (_originalContent != null) {
+        setState(() {
+          _contentController.text = _originalContent!;
+          _isSimplified = false;
+        });
+        _onFieldChanged();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Acordes originais restaurados.'), backgroundColor: Colors.blue),
+        );
+      }
+    } else {
+      _originalContent = _contentController.text;
+      final contentText = _contentController.text;
+      final regex = RegExp(r'\[(.*?)\]');
+      final newContent = contentText.replaceAllMapped(regex, (match) {
+        final chord = match.group(1)!;
+        final lower = chord.toLowerCase();
+        if (lower.contains('parte') || 
+            lower.contains('refrão') || 
+            lower.contains('refrao') || 
+            lower.contains('intro') || 
+            lower.contains('ponte') || 
+            lower.contains('solo') || 
+            lower.contains('final') || 
+            lower.contains('interl') ||
+            lower.contains('ministra')) {
+          return '[$chord]';
+        }
+        final simplified = HarmonicFieldCalculator.extractRootChord(chord);
+        return '[$simplified]';
+      });
+      setState(() {
+        _contentController.text = newContent;
+        _isSimplified = true;
+      });
+      _onFieldChanged();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Modo Simplificado. Aviso: Desativar restaurará o texto original, perdendo edições.'), 
+          duration: Duration(seconds: 4),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
   Widget _buildToolbarButton(String label, String textToInsert) {
     return FilledButton.tonal(
       onPressed: () => _insertText(textToInsert),
@@ -297,17 +349,17 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
             return AlertDialog(
               backgroundColor: colors.surfaceContainer,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text('Importar do Cifra Club', style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold)),
+              title: Text('Importar de Link', style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Cole a URL do Cifra Club abaixo para converter magicamente!', style: TextStyle(color: colors.onSurfaceVariant)),
+                  Text('Cole a URL de um site suportado abaixo para converter magicamente!', style: TextStyle(color: colors.onSurfaceVariant)),
                   const SizedBox(height: 16),
                   TextField(
                     controller: urlController,
                     style: TextStyle(color: colors.onSurface),
                     decoration: InputDecoration(
-                      hintText: 'https://www.cifraclub.com.br/...',
+                      hintText: 'https://...',
                       hintStyle: TextStyle(color: colors.onSurfaceVariant.withOpacity(0.5)),
                       border: const OutlineInputBorder(),
                       filled: true,
@@ -975,9 +1027,12 @@ E os acordes [G]entre colchetes
                     ),
                   ),
                   const SizedBox(height: 12),
-                  InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Tom Original',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Tom Original',
                       labelStyle: TextStyle(color: Colors.white54, fontSize: 13),
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1029,6 +1084,21 @@ E os acordes [G]entre colchetes
                       ),
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Simplificar Acordes',
+                  child: IconButton.filledTonal(
+                    onPressed: _simplifyChords,
+                    icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
+                        foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                      ),
+                  ),
+                ),
+              ],
+            ),
                   const SizedBox(height: 16),
                   // Toolbar
                   SingleChildScrollView(
@@ -1048,8 +1118,7 @@ E os acordes [G]entre colchetes
                         _buildToolbarButton('Ponte', '[Ponte]\n'),
                         const SizedBox(width: 6),
                         _buildToolbarButton('OBS', 'OBS: '),
-                        const SizedBox(width: 6),
-                        _buildToolbarButton('Compasso ( | )', ' | '),
+
                       ],
                     ),
                   ),
@@ -1344,7 +1413,7 @@ E os acordes [G]entre colchetes
                       FilledButton.icon(
                         onPressed: _saveToFirebase,
                         icon: const Icon(Icons.cloud_upload, size: 16),
-                        label: const Text('SALVAR NO DB'),
+                        label: const Text('SALVAR MÚSICA'),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -1503,11 +1572,27 @@ E os acordes [G]entre colchetes
                                     onChanged: (v) {
                                       if (v != null) {
                                         _transposeEditorContent(fromKey: _selectedKey, toKey: v);
-                                        setState(() => _selectedKey = v);
+setState(() => _selectedKey = v);
                                         _onFieldChanged();
                                       }
                                     },
                                   ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            SizedBox(
+                              height: 56,
+                              child: FilledButton.icon(
+                                onPressed: _simplifyChords,
+                                icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
+                                label: const Text('Simplificar'),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
+                                  foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  elevation: 0,
                                 ),
                               ),
                             ),
@@ -1535,8 +1620,7 @@ E os acordes [G]entre colchetes
                                     _buildToolbarButton('Ponte', '[Ponte]\n'),
                                     const SizedBox(width: 8),
                                     _buildToolbarButton('OBS', 'OBS: '),
-                                    const SizedBox(width: 8),
-                                    _buildToolbarButton('Compasso ( | )', ' | '),
+
                                   ],
                                 ),
                               ),

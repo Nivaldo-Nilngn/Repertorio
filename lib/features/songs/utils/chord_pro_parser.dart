@@ -208,6 +208,12 @@ class RoadmapRow {
   });
 }
 
+class MeasureWithLyric {
+  final List<String> chords;
+  final String? lyricHint;
+  MeasureWithLyric(this.chords, this.lyricHint);
+}
+
 class SongRoadmapBuilder {
   static List<SongSection> build(ParsedSong parsedSong) {
     List<SongSection> sections = [];
@@ -216,37 +222,52 @@ class SongRoadmapBuilder {
     String currentSectionTitle = 'INTRODUÇÃO';
     List<RoadmapRow> currentRows = [];
     
-    List<List<String>> paragraphMeasures = [];
-    String? paragraphHint;
-    String? paragraphRepetition;
+    List<MeasureWithLyric> sectionMeasures = [];
+    String? currentSectionRepetition;
+    String? pendingHint;
 
-    List<RoadmapRow> _processParagraphMeasures(List<List<String>> measures, String? hint, String? baseRepetition) {
+    List<RoadmapRow> _processMeasures(List<MeasureWithLyric> measures, String? baseRepetition) {
       if (measures.isEmpty) return [];
       
       List<RoadmapRow> result = [];
-      List<List<String>> current = List.from(measures);
+      List<MeasureWithLyric> current = List.from(measures);
       
       while (current.isNotEmpty) {
         bool foundSplit = false;
         
         for (int start = 0; start <= current.length - 2; start++) {
           int maxL = (current.length - start) ~/ 2;
-          for (int L = maxL; L >= 1; L--) {
+          
+          int bestL = -1;
+          int bestCount = 0;
+          int maxCovered = 0;
+
+          for (int L = 1; L <= maxL; L++) {
             final chunk1 = current.sublist(start, start + L);
             final chunk2 = current.sublist(start + L, start + 2 * L);
-            if (_areMeasuresEqual(chunk1, chunk2)) {
-              if (start > 0) {
-                result.add(RoadmapRow(
-                  hint: result.isEmpty ? hint : null,
-                  measures: current.sublist(0, start),
-                ));
+            
+            bool areChunksEqual = true;
+            for (int i = 0; i < L; i++) {
+              if (!_areMeasuresEqual([chunk1[i].chords], [chunk2[i].chords])) {
+                areChunksEqual = false;
+                break;
               }
-              
+            }
+            
+            if (areChunksEqual) {
               int count = 2;
               int nextIdx = start + 2 * L;
               while (nextIdx + L <= current.length) {
                 final nextChunk = current.sublist(nextIdx, nextIdx + L);
-                if (_areMeasuresEqual(chunk1, nextChunk)) {
+                bool nextEqual = true;
+                for (int i = 0; i < L; i++) {
+                  if (!_areMeasuresEqual([chunk1[i].chords], [nextChunk[i].chords])) {
+                    nextEqual = false;
+                    break;
+                  }
+                }
+                
+                if (nextEqual) {
                   count++;
                   nextIdx += L;
                 } else {
@@ -254,24 +275,43 @@ class SongRoadmapBuilder {
                 }
               }
               
-              result.add(RoadmapRow(
-                hint: (start == 0 && result.isEmpty) ? hint : null,
-                measures: chunk1,
-                repetition: '${count}x',
-              ));
-              
-              current = current.sublist(nextIdx);
-              foundSplit = true;
-              break;
+              int covered = L * count;
+              if (covered > maxCovered || (covered == maxCovered && L < bestL)) {
+                maxCovered = covered;
+                bestL = L;
+                bestCount = count;
+              }
             }
           }
-          if (foundSplit) break;
+          
+          if (bestL != -1) {
+            final L = bestL;
+            final count = bestCount;
+            final chunk1 = current.sublist(start, start + L);
+            
+            if (start > 0) {
+              result.add(RoadmapRow(
+                hint: result.isEmpty ? current[0].lyricHint : null,
+                measures: current.sublist(0, start).map((m) => m.chords).toList(),
+              ));
+            }
+            
+            result.add(RoadmapRow(
+              hint: (start == 0 && result.isEmpty) ? current[0].lyricHint : chunk1[0].lyricHint,
+              measures: chunk1.map((m) => m.chords).toList(),
+              repetition: '${count}x',
+            ));
+            
+            current = current.sublist(start + L * count);
+            foundSplit = true;
+            break;
+          }
         }
         
         if (!foundSplit) {
           result.add(RoadmapRow(
-            hint: result.isEmpty ? hint : null,
-            measures: current,
+            hint: result.isEmpty ? current[0].lyricHint : current[0].lyricHint,
+            measures: current.map((m) => m.chords).toList(),
             repetition: (result.length == 0) ? baseRepetition : null,
           ));
           break;
@@ -289,22 +329,14 @@ class SongRoadmapBuilder {
       return result;
     }
 
-    void saveCurrentParagraph() {
-      if (paragraphMeasures.isNotEmpty) {
-        final measuresCopy = List<List<String>>.from(paragraphMeasures);
-        
-        // Use our new dynamic splitting and repetition detector
-        final processedRows = _processParagraphMeasures(measuresCopy, paragraphHint, paragraphRepetition);
-        currentRows.addAll(processedRows);
-        
-        paragraphMeasures.clear();
-        paragraphHint = null;
-        paragraphRepetition = null;
-      }
-    }
-
     void saveCurrentSection() {
-      saveCurrentParagraph();
+      if (sectionMeasures.isNotEmpty) {
+        final processedRows = _processMeasures(sectionMeasures, currentSectionRepetition);
+        currentRows.addAll(processedRows);
+        sectionMeasures.clear();
+        currentSectionRepetition = null;
+        pendingHint = null;
+      }
       if (currentRows.isNotEmpty) {
         sections.add(SongSection(
           title: currentSectionTitle,
@@ -337,7 +369,8 @@ class SongRoadmapBuilder {
 
       // Check if it's an empty line (paragraph separator)
       if (cleanLyrics.isEmpty && !hasChords) {
-        saveCurrentParagraph();
+        // We no longer split by paragraph, but an empty line means pendingHint is reset
+        pendingHint = null;
         continue;
       }
 
@@ -401,10 +434,10 @@ class SongRoadmapBuilder {
         continue;
       }
 
-      // If it's a comment but not a section/obs, treat it as a hint for current paragraph
+      // If it's a comment but not a section/obs, treat it as a hint
       if (line.type == 'comment') {
-        if (paragraphHint == null && cleanLyrics.isNotEmpty) {
-          paragraphHint = cleanLyrics;
+        if (pendingHint == null && cleanLyrics.isNotEmpty) {
+          pendingHint = cleanLyrics;
         }
         continue;
       }
@@ -418,7 +451,16 @@ class SongRoadmapBuilder {
         final rawLineText = line.lyrics;
         final repMatch = repRegex.firstMatch(rawLineText);
         if (repMatch != null) {
-          paragraphRepetition = repMatch.group(1);
+          currentSectionRepetition = repMatch.group(1);
+        }
+
+        // Determine hint for this row if not set
+        String? currentHint = pendingHint;
+        if (currentHint == null) {
+          final cleanLyricHint = rawLineText.replaceAll(RegExp(r'\[.*?\]'), '').trim();
+          if (cleanLyricHint.isNotEmpty) {
+            currentHint = cleanLyricHint.replaceAll(repRegex, '').trim();
+          }
         }
 
         // Split chords into measures
@@ -452,20 +494,18 @@ class SongRoadmapBuilder {
         }
 
         if (lineMeasures.isNotEmpty) {
-          paragraphMeasures.addAll(lineMeasures);
-        }
-
-        // Determine hint for this row if not set
-        if (paragraphHint == null) {
-          final cleanLyricHint = rawLineText.replaceAll(RegExp(r'\[.*?\]'), '').trim();
-          if (cleanLyricHint.isNotEmpty) {
-            paragraphHint = cleanLyricHint.replaceAll(repRegex, '').trim();
+          for (int i = 0; i < lineMeasures.length; i++) {
+            // Assign the lyric hint only to the first measure of the line, or all?
+            // Actually, assigning to all is fine since we just read from the first measure of the chunk.
+            sectionMeasures.add(MeasureWithLyric(lineMeasures[i], currentHint));
           }
         }
+        
+        pendingHint = null;
       } else {
-        // Lyric line without chords: save as pending hint for current paragraph if not set
-        if (paragraphHint == null && cleanLyrics.isNotEmpty) {
-          paragraphHint = cleanLyrics;
+        // Lyric line without chords: save as pending hint
+        if (pendingHint == null && cleanLyrics.isNotEmpty) {
+          pendingHint = cleanLyrics;
         }
       }
     }
@@ -484,7 +524,7 @@ class SongRoadmapBuilder {
         if (activeRow == null) {
           activeRow = row;
         } else {
-          if (_areMeasuresEqual(activeRow.measures, row.measures)) {
+          if (_areMeasuresEqual(activeRow.measures, row.measures) && activeRow.hint == row.hint) {
             int count1 = _parseRepetition(activeRow.repetition);
             int count2 = _parseRepetition(row.repetition);
             int total = count1 + count2;

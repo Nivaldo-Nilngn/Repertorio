@@ -69,7 +69,7 @@ class HarmonicFieldCalculator {
     // Remove notas de baixo (ex: /E)
     final chordNoBass = rawChord.split('/').first;
     
-    final match = RegExp(r'^([CDEFGAB][#b]?)(m|dim|°|aug|\+)?').firstMatch(chordNoBass);
+    final match = RegExp(r'^([CDEFGAB][#b]?)(m|dim|°|º|aug|\+)?').firstMatch(chordNoBass);
     if (match == null) return chordNoBass;
     
     final root = match.group(1)!;
