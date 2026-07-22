@@ -14,6 +14,7 @@ import '../../songs/utils/chord_transposer.dart';
 import '../../songs/utils/harmonic_field_calculator.dart';
 import '../../songs/utils/chord_converter_utility.dart';
 import 'cifraclub_importer.dart';
+import '../../midi/providers/midi_providers.dart';
 
 enum ChordFormat { chordPro, text, traditional }
 
@@ -592,6 +593,28 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
 
     try {
       await ref.read(songRepositoryProvider).createSong(song);
+
+      if (_selectedFolderId != null) {
+        final allSetlists = ref.read(setlistListProvider).value ?? [];
+        final matchedSetlist = allSetlists.where((s) => s.id == _selectedFolderId).firstOrNull;
+        if (matchedSetlist != null) {
+          final alreadyExists = matchedSetlist.items.any((item) => item.songId == song.id);
+          if (!alreadyExists) {
+            final newItem = SetlistItem(
+              type: 'song',
+              title: song.title,
+              subtitle: song.artist,
+              key: song.key,
+              songId: song.id,
+            );
+            final updatedSetlist = matchedSetlist.copyWith(
+              items: [...matchedSetlist.items, newItem],
+            );
+            await ref.read(songRepositoryProvider).updateSetlist(updatedSetlist);
+          }
+        }
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1162,6 +1185,28 @@ E os acordes [G]entre colchetes
         });
       }
     }
+
+    ref.listen<String?>(midiActionStreamProvider, (previous, next) {
+      if (next == 'next_song' || next == 'prev_song') {
+        if (filteredSongs.isEmpty) return;
+        
+        final currentId = ref.read(selectedSongIdProvider);
+        int currentIndex = filteredSongs.indexWhere((s) => s.id == currentId);
+        if (currentIndex == -1) currentIndex = 0;
+        
+        int newIndex = currentIndex;
+        if (next == 'next_song') {
+          newIndex = (currentIndex + 1) % filteredSongs.length;
+        } else if (next == 'prev_song') {
+          newIndex = (currentIndex - 1) % filteredSongs.length;
+          if (newIndex < 0) newIndex += filteredSongs.length;
+        }
+        
+        final nextSong = filteredSongs[newIndex];
+        ref.read(selectedSongIdProvider.notifier).select(nextSong.id);
+        ref.read(editingChordProProvider.notifier).state = nextSong.content;
+      }
+    });
 
     final selectedSongId = ref.watch(selectedSongIdProvider);
     final isEditorVisible = ref.watch(isEditorVisibleProvider);

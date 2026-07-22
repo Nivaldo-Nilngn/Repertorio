@@ -8,7 +8,9 @@ import '../providers/manager_providers.dart';
 import '../providers/editor_provider.dart';
 
 class ArrangeWorkspace extends ConsumerStatefulWidget {
-  const ArrangeWorkspace({super.key});
+  final VoidCallback? onAddSong;
+  
+  const ArrangeWorkspace({super.key, this.onAddSong});
 
   @override
   ConsumerState<ArrangeWorkspace> createState() => _ArrangeWorkspaceState();
@@ -109,6 +111,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
   }
 
   void _showCreateSetlistDialog() {
+    final colors = Theme.of(context).colorScheme;
     final nameController = TextEditingController();
     final now = DateTime.now();
     final months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -121,16 +124,48 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              title: const Text('Novo Repertório'),
+              backgroundColor: colors.surface,
+              elevation: 10,
+              shadowColor: Colors.black.withOpacity(0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: colors.outline.withOpacity(0.1)),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+              title: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.playlist_add, color: colors.primary, size: 32),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Novo Repertório',
+                    style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nome do Repertório'),
+                    decoration: InputDecoration(
+                      labelText: 'Nome do Repertório',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: colors.surfaceContainer,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: dateController,
                     readOnly: true,
@@ -146,17 +181,27 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                         dateController.text = "${picked.day} ${months[picked.month - 1]}, ${picked.year}";
                       }
                     },
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Data / Evento',
-                      suffixIcon: Icon(Icons.calendar_today),
+                      suffixIcon: Icon(Icons.calendar_today, color: colors.primary),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: colors.surfaceContainer,
                     ),
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('CANCELAR'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('CANCELAR', style: TextStyle(color: colors.onSurfaceVariant)),
                 ),
                 FilledButton(
                   onPressed: () async {
@@ -185,7 +230,11 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                       );
                     }
                   },
-                  child: const Text('CRIAR'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('CRIAR', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -196,6 +245,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
   }
 
   void _showEditSetlistDialog(SongSetlist setlist) {
+    final colors = Theme.of(context).colorScheme;
     final nameController = TextEditingController(text: setlist.name);
     final dateController = TextEditingController(text: setlist.date);
 
@@ -205,16 +255,48 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              title: const Text('Editar Repertório'),
+              backgroundColor: colors.surface,
+              elevation: 10,
+              shadowColor: Colors.black.withOpacity(0.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: BorderSide(color: colors.outline.withOpacity(0.1)),
+              ),
+              titlePadding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+              title: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.edit_note, color: colors.primary, size: 32),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Editar Repertório',
+                    style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: nameController,
-                    decoration: const InputDecoration(labelText: 'Nome do Repertório'),
+                    decoration: InputDecoration(
+                      labelText: 'Nome do Repertório',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: colors.surfaceContainer,
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   TextField(
                     controller: dateController,
                     readOnly: true,
@@ -230,17 +312,27 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                         dateController.text = "${picked.day} ${months[picked.month - 1]}, ${picked.year}";
                       }
                     },
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Data / Evento',
-                      suffixIcon: Icon(Icons.calendar_today),
+                      suffixIcon: Icon(Icons.calendar_today, color: colors.primary),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: colors.surfaceContainer,
                     ),
                   ),
                 ],
               ),
+              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('CANCELAR'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: Text('CANCELAR', style: TextStyle(color: colors.onSurfaceVariant)),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -266,7 +358,11 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                       );
                     }
                   },
-                  child: const Text('SALVAR'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('SALVAR', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ],
             );
@@ -512,245 +608,331 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
     // Sort chronologically reverse (newest created at the top)
     final sortedSetlists = setlists.reversed.toList();
 
-    return Row(
-      children: [
-        Container(
-          width: 400,
-          color: Theme.of(context).colorScheme.surfaceContainer,
-          child: _buildBibliotecaView(songAsync, colors),
-        ),
-        Container(width: 1, color: colors.outline.withOpacity(0.4)),
-        Expanded(
-          child: Padding(
-      padding: const EdgeInsets.all(32.0),
+    return Container(
+      color: colors.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Gerenciador de Repertórios',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: colors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Crie, edite ou exclua os roteiros de culto e eventos',
-                    style: TextStyle(color: colors.onSurfaceVariant, fontSize: 14),
-                  ),
-                ],
+          // Banner/Header Area
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(48, 48, 48, 32),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [colors.primary.withOpacity(0.05), Colors.transparent],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
-              FilledButton.icon(
-                onPressed: _showCreateSetlistDialog,
-                icon: const Icon(Icons.add),
-                label: const Text('NOVO REPERTÓRIO'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              border: Border(bottom: BorderSide(color: colors.outline.withOpacity(0.1))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: colors.primary.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.auto_awesome, size: 14, color: colors.primary),
+                          const SizedBox(width: 8),
+                          Text('Seus Eventos', style: TextStyle(color: colors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Repertórios',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            color: colors.onSurface,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Organize as músicas para seus cultos, shows e apresentações.',
+                      style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                FilledButton.icon(
+                  onPressed: _showCreateSetlistDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('NOVO REPERTÓRIO'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 32),
+          
+          // Grid Area
           Expanded(
             child: sortedSetlists.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.playlist_play, size: 64, color: colors.outline.withOpacity(0.5)),
-                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: colors.primary.withOpacity(0.05),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.queue_music, size: 64, color: colors.primary.withOpacity(0.5)),
+                        ),
+                        const SizedBox(height: 24),
                         Text(
                           'Nenhum repertório criado ainda.',
                           style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
                         ),
                         const SizedBox(height: 16),
-                        OutlinedButton(
+                        OutlinedButton.icon(
                           onPressed: _showCreateSetlistDialog,
-                          child: const Text('Criar Meu Primeiro Repertório'),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Criar Meu Primeiro Repertório'),
                         ),
                       ],
                     ),
                   )
-                : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 320,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                      mainAxisExtent: 180,
-                    ),
-                    itemCount: sortedSetlists.length,
-                    itemBuilder: (context, index) {
-                      final setlist = sortedSetlists[index];
-                      
-                      // Calculate duration
-                      int totalMinutes = 0;
-                      int songCount = 0;
-                      for (var item in setlist.items) {
-                        if (item.type == 'song') {
-                          totalMinutes += 4;
-                          songCount++;
-                        } else {
-                          final digits = RegExp(r'(\d+)').firstMatch(item.duration);
-                          if (digits != null) {
-                            totalMinutes += int.parse(digits.group(1)!);
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 48.0, vertical: 32.0),
+                    child: GridView.builder(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 320,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        mainAxisExtent: 180,
+                      ),
+                      itemCount: sortedSetlists.length,
+                      itemBuilder: (context, index) {
+                        final setlist = sortedSetlists[index];
+                        
+                        // Calculate duration
+                        int totalMinutes = 0;
+                        int songCount = 0;
+                        for (var item in setlist.items) {
+                          if (item.type == 'song') {
+                            totalMinutes += 4;
+                            songCount++;
+                          } else {
+                            final digits = RegExp(r'(\d+)').firstMatch(item.duration);
+                            if (digits != null) {
+                              totalMinutes += int.parse(digits.group(1)!);
+                            }
                           }
                         }
-                      }
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: colors.outline.withOpacity(0.2)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          setlist.name,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 18,
-                                            color: Colors.white,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                setlist.date,
-                                                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: colors.outline.withOpacity(0.2)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            setlist.name,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                              color: Colors.white,
                                             ),
-                                          ],
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.calendar_today, size: 12, color: colors.onSurfaceVariant),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  setlist.date,
+                                                  style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: Icon(Icons.more_vert, size: 20, color: colors.onSurfaceVariant),
+                                      tooltip: 'Opções do Repertório',
+                                      color: colors.surfaceContainerHigh,
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      onSelected: (value) async {
+                                        if (value == 'edit') {
+                                          _showEditSetlistDialog(setlist);
+                                        } else if (value == 'delete') {
+                                          final confirm = await showDialog<bool>(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              backgroundColor: colors.surface,
+                                              elevation: 10,
+                                              shadowColor: Colors.black.withOpacity(0.5),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(24),
+                                                side: BorderSide(color: colors.outline.withOpacity(0.1)),
+                                              ),
+                                              titlePadding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                                              title: Column(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.all(12),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.withOpacity(0.1),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: const Icon(Icons.delete_outline, color: Colors.red, size: 32),
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    'Excluir Repertório',
+                                                    style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ],
+                                              ),
+                                              contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                                              content: Text(
+                                                'Tem certeza que deseja excluir "${setlist.name}"?\nEsta ação não poderá ser desfeita.',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
+                                              ),
+                                              actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                                              actions: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: TextButton(
+                                                        onPressed: () => Navigator.pop(context, false),
+                                                        style: TextButton.styleFrom(
+                                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                        ),
+                                                        child: Text('CANCELAR', style: TextStyle(color: colors.onSurfaceVariant)),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: FilledButton(
+                                                        onPressed: () => Navigator.pop(context, true),
+                                                        style: FilledButton.styleFrom(
+                                                          backgroundColor: Colors.red,
+                                                          foregroundColor: Colors.white,
+                                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                        ),
+                                                        child: const Text('EXCLUIR', style: TextStyle(fontWeight: FontWeight.bold)),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          );
+
+                                          if (confirm == true) {
+                                            await ref.read(songRepositoryProvider).deleteSetlist(setlist.id);
+                                          }
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit_outlined, size: 18, color: colors.onSurface),
+                                              const SizedBox(width: 12),
+                                              Text('Editar', style: TextStyle(color: colors.onSurface)),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
+                                              const SizedBox(width: 12),
+                                              const Text('Excluir', style: TextStyle(color: Colors.redAccent)),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    icon: Icon(Icons.more_vert, size: 20, color: colors.onSurfaceVariant),
-                                    tooltip: 'Opções do Repertório',
-                                    color: colors.surfaceContainerHigh,
-                                    padding: EdgeInsets.zero,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    onSelected: (value) async {
-                                      if (value == 'edit') {
-                                        _showEditSetlistDialog(setlist);
-                                      } else if (value == 'delete') {
-                                        final confirm = await showDialog<bool>(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            backgroundColor: colors.surface,
-                                            title: const Text('Excluir Repertório'),
-                                            content: Text('Tem certeza que deseja excluir "${setlist.name}"?'),
-                                            actions: [
-                                              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCELAR')),
-                                              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('EXCLUIR'), style: FilledButton.styleFrom(backgroundColor: Colors.red)),
-                                            ],
-                                          ),
-                                        );
-
-                                        if (confirm == true) {
-                                          await ref.read(songRepositoryProvider).deleteSetlist(setlist.id);
-                                        }
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit_outlined, size: 18, color: colors.onSurface),
-                                            const SizedBox(width: 12),
-                                            Text('Editar', style: TextStyle(color: colors.onSurface)),
-                                          ],
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.delete_outline, size: 18, color: Colors.redAccent),
-                                            const SizedBox(width: 12),
-                                            const Text('Excluir', style: TextStyle(color: Colors.redAccent)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: colors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '$songCount músicas',
-                                      style: TextStyle(color: colors.primary, fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                  Text('Est. $totalMinutes min', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
-                                ],
-                              ),
-
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _activeSetlist = setlist;
-                                      _isDirty = false;
-                                    });
-                                  },
-                                  child: const Text('Organizar Roteiro', style: TextStyle(fontSize: 12)),
+                                  ],
                                 ),
-                              ),
-                            ],
+                                const Spacer(),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: colors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '$songCount músicas',
+                                        style: TextStyle(color: colors.primary, fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    Text('Est. $totalMinutes min', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11)),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _activeSetlist = setlist;
+                                        _isDirty = false;
+                                      });
+                                    },
+                                    child: const Text('Organizar Roteiro', style: TextStyle(fontSize: 12)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],
       ),
-    ),
-    ),
-      ],
     );
   }
 
@@ -946,14 +1128,65 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                                     context: context,
                                     builder: (ctx) => AlertDialog(
                                       backgroundColor: colors.surface,
-                                      title: const Text('Excluir Repertório'),
-                                      content: Text('Excluir "${setlist.name}"?'),
+                                      elevation: 10,
+                                      shadowColor: Colors.black.withOpacity(0.5),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(24),
+                                        side: BorderSide(color: colors.outline.withOpacity(0.1)),
+                                      ),
+                                      titlePadding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                                      title: Column(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withOpacity(0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.delete_outline, color: Colors.red, size: 32),
+                                          ),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Excluir Repertório',
+                                            style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
+                                      contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                                      content: Text(
+                                        'Tem certeza que deseja excluir "${setlist.name}"?\nEsta ação não poderá ser desfeita.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
+                                      ),
+                                      actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR')),
-                                        FilledButton(
-                                          onPressed: () => Navigator.pop(ctx, true),
-                                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                                          child: const Text('EXCLUIR'),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextButton(
+                                                onPressed: () => Navigator.pop(ctx, false),
+                                                style: TextButton.styleFrom(
+                                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                ),
+                                                child: Text('CANCELAR', style: TextStyle(color: colors.onSurfaceVariant)),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: FilledButton(
+                                                onPressed: () => Navigator.pop(ctx, true),
+                                                style: FilledButton.styleFrom(
+                                                  backgroundColor: Colors.red,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                                ),
+                                                child: const Text('EXCLUIR', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -1176,9 +1409,26 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('Biblioteca', style: Theme.of(context).textTheme.titleLarge),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    tooltip: 'Criar Nova Música',
+                    color: colors.primary,
+                    onPressed: () {
+                      if (_activeSetlist != null) {
+                        ref.read(songFilterProvider.notifier).setFolder(_activeSetlist!.id);
+                      }
+                      if (widget.onAddSong != null) {
+                        widget.onAddSong!();
+                      }
+                      if (setModalState != null) {
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(

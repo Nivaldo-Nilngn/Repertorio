@@ -6,6 +6,7 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:google_fonts/google_fonts.dart';
 import '../models/song.dart';
+import '../models/song_setlist.dart';
 
 import '../widgets/chord_api_viewer.dart';
 import '../widgets/circular_chord_wheel.dart';
@@ -1215,71 +1216,125 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       return;
     }
 
-    final collections = ref.read(collectionListProvider).value ?? [];
+    final setlists = ref.read(setlistListProvider).value ?? [];
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           backgroundColor: colors.surface,
-          title: const Text('Adicionar ao Repertório'),
-          content: SizedBox(
-            width: 300,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                // Option for No Collection
-                ListTile(
-                  leading: const Icon(Icons.folder_off),
-                  title: const Text('Remover do Repertório'),
-                  trailing: currentSong?.folderId == null ? const Icon(Icons.check, color: Colors.green) : null,
-                  onTap: () async {
-                    if (currentSong != null) {
-                      final updated = currentSong.copyWith(folderId: null);
-                      await ref.read(songRepositoryProvider).updateSong(updated);
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Removido do repertório!'), backgroundColor: Colors.green),
-                        );
-                      }
-                    }
-                  },
+          elevation: 10,
+          shadowColor: Colors.black.withOpacity(0.5),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: colors.outline.withOpacity(0.1)),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+          title: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                const Divider(),
-                // List of collections
-                if (collections.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16.0),
-                    child: Text('Nenhuma coleção criada ainda.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-                  ),
-                ...collections.map((col) {
-                  final isCurrent = currentSong?.folderId == col.id;
-                  return ListTile(
-                    leading: const Icon(Icons.folder),
-                    title: Text(col.name),
-                    trailing: isCurrent ? const Icon(Icons.check, color: Colors.green) : null,
-                    onTap: () async {
-                      if (currentSong != null) {
-                        final updated = currentSong.copyWith(folderId: col.id);
-                        await ref.read(songRepositoryProvider).updateSong(updated);
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Adicionado a ${col.name}!'), backgroundColor: Colors.green),
-                          );
-                        }
-                      }
-                    },
-                  );
-                }),
-              ],
+                child: Icon(Icons.playlist_add, color: colors.primary, size: 32),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Adicionar ao Repertório',
+                style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold, fontSize: 22),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          content: SizedBox(
+            width: 350,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final setlists = ref.watch(setlistListProvider).value ?? [];
+                return ListView(
+                  shrinkWrap: true,
+                  children: [
+                    if (setlists.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24.0),
+                        child: Column(
+                          children: [
+                            Icon(Icons.queue_music, size: 48, color: colors.outline.withOpacity(0.5)),
+                            const SizedBox(height: 16),
+                            Text('Nenhum repertório criado ainda.', textAlign: TextAlign.center, style: TextStyle(color: colors.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                    ...setlists.map((setlist) {
+                      final isCurrent = setlist.items.any((item) => item.songId == currentSong?.id);
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: isCurrent ? colors.primary.withOpacity(0.1) : colors.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isCurrent ? colors.primary.withOpacity(0.5) : colors.outline.withOpacity(0.1)),
+                        ),
+                        child: ListTile(
+                          leading: Icon(Icons.queue_music, color: isCurrent ? colors.primary : colors.onSurfaceVariant),
+                          title: Text(setlist.name, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
+                          subtitle: Text(setlist.date, style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant)),
+                          trailing: isCurrent 
+                              ? Icon(Icons.check_circle, color: colors.primary)
+                              : const Icon(Icons.add_circle_outline),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          onTap: () async {
+                            if (currentSong != null) {
+                              if (isCurrent) {
+                                // Remove
+                                final updatedItems = setlist.items.where((item) => item.songId != currentSong!.id).toList();
+                                await ref.read(songRepositoryProvider).updateSetlist(setlist.copyWith(items: updatedItems));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Removido de "${setlist.name}"'), backgroundColor: Colors.orange),
+                                  );
+                                }
+                              } else {
+                                // Add
+                                final newItem = SetlistItem(
+                                  type: 'song',
+                                  title: currentSong!.title,
+                                  subtitle: currentSong!.artist,
+                                  key: currentSong!.key,
+                                  songId: currentSong!.id,
+                                );
+                                final updatedItems = [...setlist.items, newItem];
+                                await ref.read(songRepositoryProvider).updateSetlist(setlist.copyWith(items: updatedItems));
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Adicionado a "${setlist.name}"!'), backgroundColor: Colors.green),
+                                  );
+                                }
+                              }
+                            }
+                          },
+                        ),
+                      );
+                    }),
+                  ],
+                );
+              },
             ),
           ),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('FECHAR'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.pop(context),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('FECHAR', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         );

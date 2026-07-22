@@ -98,8 +98,8 @@ class MidiNotifier extends Notifier<MidiState> {
 
   @override
   MidiState build() {
-    _midiService = ref.read(midiServiceProvider);
-    _storage = ref.read(midiStorageServiceProvider);
+    _midiService = ref.watch(midiServiceProvider);
+    _storage = ref.watch(midiStorageServiceProvider);
     
     ref.onDispose(() {
       _midiSub?.cancel();

@@ -31,13 +31,21 @@ class MidiStorageService {
                 parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
               }
             }
-            if (parsedProfiles.isNotEmpty) return parsedProfiles;
+            if (parsedProfiles.isNotEmpty) {
+              // Atualizar cache local
+              html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
+              return parsedProfiles;
+            }
           } else if (data is List) {
             final list = List<dynamic>.from(data);
             final parsedProfiles = list.where((e) => e != null).map((e) {
               return MidiProfile.fromJson(Map<String, dynamic>.from(e as Map));
             }).toList();
-            if (parsedProfiles.isNotEmpty) return parsedProfiles;
+            if (parsedProfiles.isNotEmpty) {
+              // Atualizar cache local
+              html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
+              return parsedProfiles;
+            }
           }
         }
       } catch (e) {
@@ -45,8 +53,18 @@ class MidiStorageService {
       }
     }
 
-    // Fallback to local storage
-    return _loadFromLocalStorage();
+    // Fallback para o local storage
+    final localProfiles = _loadFromLocalStorage();
+    
+    // Se o usuário está logado mas não tinha perfis no Firebase, sincroniza os locais pra nuvem
+    if (_profilesRef != null) {
+      final isModified = localProfiles.length > 1 || (localProfiles.isNotEmpty && localProfiles.first.mappings.isNotEmpty);
+      if (isModified) {
+        saveProfiles(localProfiles);
+      }
+    }
+    
+    return localProfiles;
   }
 
   List<MidiProfile> _loadFromLocalStorage() {

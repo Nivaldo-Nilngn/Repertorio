@@ -130,8 +130,10 @@ Coloque sua [C]letra aqui
 E os acordes [G]entre colchetes
 ''';
                         ref.read(isEditorVisibleProvider.notifier).state = true;
-                        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                        ref.read(songFilterProvider.notifier).clearExceptFolder();
+                        if (ref.read(sidebarTabProvider) != SidebarTab.prepare) {
+                          ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                          ref.read(songFilterProvider.notifier).clearExceptFolder();
+                        }
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -235,8 +237,10 @@ E os acordes [G]entre colchetes
                             if (mounted) {
                               Navigator.pop(context);
                               // Switch to songs tab and clear filters
-                              ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                              ref.read(songFilterProvider.notifier).clearExceptFolder();
+                              if (ref.read(sidebarTabProvider) != SidebarTab.prepare) {
+                                ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
+                                ref.read(songFilterProvider.notifier).clearExceptFolder();
+                              }
                               
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Importado com sucesso!'), backgroundColor: Colors.green),
@@ -568,21 +572,33 @@ E os acordes [G]entre colchetes
 
   Widget _buildMainWorkspace(SidebarTab activeTab, WidgetRef ref) {
     final isEditorVisible = ref.watch(isEditorVisibleProvider);
-    if (isEditorVisible) {
-      return const EditorWorkspace();
-    }
-
+    
+    Widget workspace;
     switch (activeTab) {
       case SidebarTab.songs:
       case SidebarTab.favorites:
-        return const SongsWorkspace();
+        workspace = const SongsWorkspace();
+        break;
       case SidebarTab.prepare:
-        return const ArrangeWorkspace();
+        workspace = ArrangeWorkspace(onAddSong: _showAddSongDialog);
+        break;
       case SidebarTab.artists:
-        return const ArtistsWorkspace();
+        workspace = const ArtistsWorkspace();
+        break;
       case SidebarTab.settings:
-        return const SettingsWorkspace();
+        workspace = const SettingsWorkspace();
+        break;
     }
+
+    return Stack(
+      children: [
+        workspace,
+        if (isEditorVisible)
+          const Positioned.fill(
+            child: EditorWorkspace(),
+          ),
+      ],
+    );
   }
 
   // O widget AppMenu agora cuida de toda a renderização do Menu (Topo ou Lateral)
