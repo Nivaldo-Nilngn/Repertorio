@@ -226,8 +226,27 @@ class MidiNotifier extends Notifier<MidiState> {
 
   void removeMapping(String actionKey) {
     final profile = state.activeProfile;
-    final updatedMappings = Map<String, MidiCommand>.from(profile.mappings);
+    final updatedMappings = Map<String, List<MidiCommand>>.from(profile.mappings);
     updatedMappings.remove(actionKey);
+    
+    final updatedProfile = profile.copyWith(mappings: updatedMappings);
+    final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
+    
+    state = state.copyWith(profiles: updatedProfiles);
+    _storage.saveProfiles(updatedProfiles);
+  }
+
+  void removeSingleMapping(String actionKey, MidiCommand command) {
+    final profile = state.activeProfile;
+    final updatedMappings = Map<String, List<MidiCommand>>.from(profile.mappings);
+    final commands = List<MidiCommand>.from(updatedMappings[actionKey] ?? []);
+    commands.removeWhere((c) => c == command);
+    
+    if (commands.isEmpty) {
+      updatedMappings.remove(actionKey);
+    } else {
+      updatedMappings[actionKey] = commands;
+    }
     
     final updatedProfile = profile.copyWith(mappings: updatedMappings);
     final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
@@ -280,16 +299,20 @@ class MidiNotifier extends Notifier<MidiState> {
       // Check for conflicts
       final profile = state.activeProfile;
       String? conflictingAction;
-      profile.mappings.forEach((action, mapping) {
-        if (mapping == cmd) conflictingAction = action;
+      profile.mappings.forEach((action, mappingList) {
+        if (mappingList.any((m) => m == cmd)) conflictingAction = action;
       });
 
       if (conflictingAction != null && conflictingAction != state.learningAction) {
         // We could emit a conflict warning, but for now we just overwrite
       }
 
-      final updatedMappings = Map<String, MidiCommand>.from(profile.mappings);
-      updatedMappings[state.learningAction!] = cmd;
+      final updatedMappings = Map<String, List<MidiCommand>>.from(profile.mappings);
+      final existingCommands = List<MidiCommand>.from(updatedMappings[state.learningAction!] ?? []);
+      if (!existingCommands.any((c) => c == cmd)) {
+        existingCommands.add(cmd);
+      }
+      updatedMappings[state.learningAction!] = existingCommands;
       
       final updatedProfile = profile.copyWith(mappings: updatedMappings);
       final updatedProfiles = state.profiles.map((p) => p.id == updatedProfile.id ? updatedProfile : p).toList();
@@ -317,8 +340,8 @@ class MidiNotifier extends Notifier<MidiState> {
       // Find matching action
       final profile = state.activeProfile;
       String? matchedAction;
-      profile.mappings.forEach((action, mapping) {
-        if (mapping == cmd) matchedAction = action;
+      profile.mappings.forEach((action, mappingList) {
+        if (mappingList.any((m) => m == cmd)) matchedAction = action;
       });
 
       if (matchedAction != null) {

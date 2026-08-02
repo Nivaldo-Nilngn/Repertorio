@@ -529,14 +529,20 @@ class MidiSettingsPanel extends ConsumerWidget {
     MidiNotifier notifier,
     ColorScheme colors,
   ) {
-    final mapping = activeProfile.mappings[actionKey];
+    final mappings = activeProfile.mappings[actionKey];
     final isLearningThis = state.isLearning && state.learningAction == actionKey;
+    final hasMappings = mappings != null && mappings.isNotEmpty;
+    final mappingList = mappings ?? [];
 
     String mappingText = 'Não mapeado';
     if (isLearningThis) {
       mappingText = 'Aguardando MIDI...';
-    } else if (mapping != null) {
-      mappingText = 'Sinal ${mapping.command} • N/CC ${mapping.noteOrCc}';
+    } else if (hasMappings) {
+      if (mappingList.length == 1) {
+        mappingText = 'Sinal ${mappingList[0].command} • N/CC ${mappingList[0].noteOrCc}';
+      } else {
+        mappingText = '${mappingList.length} mapeamentos';
+      }
     }
 
     return InkWell(
@@ -544,81 +550,107 @@ class MidiSettingsPanel extends ConsumerWidget {
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isLearningThis ? colors.primaryContainer : colors.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, size: 20, color: isLearningThis ? colors.onPrimaryContainer : colors.onSurfaceVariant),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: isLearningThis ? colors.primary : colors.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isLearningThis ? colors.primaryContainer : colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    mappingText,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: mapping != null ? FontWeight.bold : FontWeight.normal,
-                      color: isLearningThis ? colors.primary : (mapping != null ? colors.onSurface : colors.onSurfaceVariant),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Icon(icon, size: 20, color: isLearningThis ? colors.onPrimaryContainer : colors.onSurfaceVariant),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isLearningThis ? colors.primary : colors.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        mappingText,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: hasMappings ? FontWeight.bold : FontWeight.normal,
+                          color: isLearningThis ? colors.primary : (hasMappings ? colors.onSurface : colors.onSurfaceVariant),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 12),
+                if (isLearningThis)
+                  FilledButton.tonal(
+                    onPressed: () => notifier.cancelLearning(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.errorContainer,
+                      foregroundColor: colors.onErrorContainer,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(50, 32),
+                    ),
+                    child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  )
+                else
+                  OutlinedButton(
+                    onPressed: () => notifier.startLearning(actionKey),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: hasMappings ? colors.primary.withOpacity(0.5) : colors.outline),
+                      foregroundColor: hasMappings ? colors.primary : colors.onSurface,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: const Size(50, 32),
+                    ),
+                    child: Text(hasMappings ? 'ADICIONAR' : 'MAPEAR', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  ),
+                if (hasMappings) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    color: colors.error,
+                    tooltip: 'Remover Todos',
+                    onPressed: () {
+                       notifier.removeMapping(actionKey);
+                    },
+                  ),
+                ]
+              ],
             ),
-            const SizedBox(width: 12),
-            if (isLearningThis)
-              FilledButton.tonal(
-                onPressed: () => notifier.cancelLearning(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: colors.errorContainer,
-                  foregroundColor: colors.onErrorContainer,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(50, 32),
-                ),
-                child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-              )
-            else
-              OutlinedButton(
-                onPressed: () => notifier.startLearning(actionKey),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: mapping != null ? colors.primary.withOpacity(0.5) : colors.outline),
-                  foregroundColor: mapping != null ? colors.primary : colors.onSurface,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(50, 32),
-                ),
-                child: Text(mapping != null ? 'REMAPEAR' : 'MAPEAR', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+            if (hasMappings && mappingList.length > 1) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: mappings.map((cmd) {
+                  return Chip(
+                    label: Text(
+                      'Cmd ${cmd.command} • N/CC ${cmd.noteOrCc}',
+                      style: TextStyle(fontSize: 10, color: colors.onSurface),
+                    ),
+                    deleteIcon: Icon(Icons.close, size: 14, color: colors.error),
+                    onDeleted: () => notifier.removeSingleMapping(actionKey, cmd),
+                    backgroundColor: colors.surfaceContainerHighest,
+                    padding: EdgeInsets.zero,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  );
+                }).toList(),
               ),
-            if (mapping != null) ...[
-              const SizedBox(width: 8),
-              IconButton(
-                icon: const Icon(Icons.delete_outline, size: 20),
-                color: colors.error,
-                tooltip: 'Remover Mapeamento',
-                onPressed: () {
-                   notifier.removeMapping(actionKey);
-                },
-              ),
-            ]
+            ],
           ],
         ),
       ),

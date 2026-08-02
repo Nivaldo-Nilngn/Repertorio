@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import '../models/song.dart';
 import '../models/song_setlist.dart';
 
 import '../widgets/chord_api_viewer.dart';
+import '../widgets/native_chord_diagram.dart';
 import '../widgets/circular_chord_wheel.dart';
 import '../utils/chord_pro_parser.dart';
 import '../utils/chord_transposer.dart';
@@ -62,6 +64,11 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   bool _showFab = true;
   Timer? _fabTimer;
+  bool _isPerformanceMode = false;
+  bool _showPerformanceControls = true;
+  Timer? _performanceControlsTimer;
+  final List<DateTime> _tapTimes = [];
+  int _detectedBpm = 0;
 
   void _startFabTimer() {
     _fabTimer?.cancel();
@@ -85,6 +92,82 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         _startFabTimer();
       }
     });
+  }
+
+  void _togglePerformanceMode() {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _isPerformanceMode = !_isPerformanceMode;
+      if (_isPerformanceMode) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+          DeviceOrientation.portraitUp,
+        ]);
+        _startPerformanceControlsTimer();
+        _fontSize.value = (_fontSize.value + 4).clamp(10.0, 48.0);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        SystemChrome.setPreferredOrientations([]);
+        _performanceControlsTimer?.cancel();
+        _showPerformanceControls = true;
+      }
+    });
+  }
+
+  void _startPerformanceControlsTimer() {
+    _performanceControlsTimer?.cancel();
+    _performanceControlsTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted && _isPerformanceMode) {
+        setState(() => _showPerformanceControls = false);
+      }
+    });
+  }
+
+  void _onPerformanceTap() {
+    if (_isPerformanceMode) {
+      setState(() => _showPerformanceControls = !_showPerformanceControls);
+      if (_showPerformanceControls) {
+        _startPerformanceControlsTimer();
+      }
+    }
+  }
+
+  void _tapTempo() {
+    HapticFeedback.lightImpact();
+    final now = DateTime.now();
+    _tapTimes.add(now);
+
+    // Keep only last 8 taps
+    if (_tapTimes.length > 8) {
+      _tapTimes.removeAt(0);
+    }
+
+    // Reset if more than 3 seconds since last tap
+    if (_tapTimes.length >= 2) {
+      final lastGap = _tapTimes.last.difference(_tapTimes[_tapTimes.length - 2]).inMilliseconds;
+      if (lastGap > 3000) {
+        _tapTimes.clear();
+        _tapTimes.add(now);
+        setState(() => _detectedBpm = 0);
+        return;
+      }
+    }
+
+    if (_tapTimes.length >= 2) {
+      int totalMs = 0;
+      for (int i = 1; i < _tapTimes.length; i++) {
+        totalMs += _tapTimes[i].difference(_tapTimes[i - 1]).inMilliseconds;
+      }
+      final avgMs = totalMs ~/ (_tapTimes.length - 1);
+      setState(() => _detectedBpm = (60000 / avgMs).round());
+    }
+  }
+
+  void _resetTapTempo() {
+    _tapTimes.clear();
+    setState(() => _detectedBpm = 0);
   }
 
   void _onScroll() {
@@ -129,6 +212,8 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     _registerVideoIframe();
     _scrollController.addListener(_onScroll);
     _startFabTimer();
+
+    WakelockPlus.enable();
   }
 
   html.IFrameElement? _youtubeIframe;
@@ -172,10 +257,16 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   void dispose() {
     _autoScrollTimer?.cancel();
     _fabTimer?.cancel();
+    _performanceControlsTimer?.cancel();
     _scrollController.dispose();
     _fontSize.dispose();
     _transposeSteps.dispose();
     _instrument.dispose();
+    WakelockPlus.disable();
+    if (_isPerformanceMode) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([]);
+    }
     super.dispose();
   }
 
@@ -364,6 +455,9 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         _registerVideoIframe();
       });
     }
+    if (oldWidget.song?.id != widget.song?.id) {
+      _transposeSteps.value = widget.song?.transposeSteps ?? 0;
+    }
     if (oldWidget.isFavorite != widget.isFavorite) {
       setState(() {
         _isFavoriteLocal = widget.isFavorite;
@@ -475,6 +569,10 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     });
 
     final colors = Theme.of(context).colorScheme;
+
+    if (_isPerformanceMode) {
+      return _buildPerformanceMode(colors);
+    }
 
     // Layout responsivo
     return LayoutBuilder(
@@ -762,6 +860,8 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
                     _buildFloatingTile(Icons.playlist_add, 'Lista', _showAddToCollectionDialog, colors),
                     _buildFloatingTile(Icons.menu_book, 'Dicionário', _showChordsDictionaryDialog, colors),
+                    _buildFloatingTile(Icons.fullscreen, 'Palco', _togglePerformanceMode, colors, isActive: _isPerformanceMode),
+                    _buildFloatingTile(Icons.timer, _detectedBpm > 0 ? '$_detectedBpm' : 'Tap', _tapTempo, colors, isActive: _detectedBpm > 0),
                     _buildFloatingTile(Icons.push_pin_outlined, 'Fixar', _toggleFabPin, colors),
                   ],
                 ),
@@ -890,6 +990,168 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
       ),
     );
       },
+    );
+  }
+
+  Widget _buildPerformanceMode(ColorScheme colors) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _onPerformanceTap,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(48, 48, 48, 120),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([_fontSize, _transposeSteps, _instrument]),
+                      builder: (context, _) {
+                        return _viewMode == SongViewMode.lyrics
+                            ? _buildLyricsContent()
+                            : _viewMode == SongViewMode.roadmap
+                                ? _buildRoadmapContent()
+                                : _buildHarmonicFieldContent();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_isAutoScrolling)
+              Positioned(
+                bottom: 16,
+                left: 0,
+                right: 0,
+                child: Center(child: _buildAutoScrollOverlay()),
+              ),
+            if (_showPerformanceControls)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.0),
+                        Colors.black.withOpacity(0.95),
+                      ],
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(24, 48, 24, 16),
+                  child: SafeArea(
+                    top: false,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildPerformanceControl(
+                          icon: Icons.remove,
+                          label: 'TEXTO -',
+                          onTap: () => _changeFontSize(-2),
+                          colors: colors,
+                        ),
+                        _buildPerformanceControl(
+                          icon: Icons.add,
+                          label: 'TEXTO +',
+                          onTap: () => _changeFontSize(2),
+                          colors: colors,
+                        ),
+                        _buildPerformanceControl(
+                          icon: Icons.remove,
+                          label: 'TOM -',
+                          onTap: () => _changeTranspose(-1),
+                          colors: colors,
+                        ),
+                        _buildPerformanceControl(
+                          icon: Icons.add,
+                          label: 'TOM +',
+                          onTap: () => _changeTranspose(1),
+                          colors: colors,
+                        ),
+                        _buildPerformanceControl(
+                          icon: _isAutoScrolling ? Icons.pause : Icons.play_arrow,
+                          label: _isAutoScrolling ? 'PAUSAR' : 'ROLAR',
+                          onTap: _toggleAutoScroll,
+                          colors: colors,
+                          isActive: _isAutoScrolling,
+                        ),
+                        _buildPerformanceControl(
+                          icon: Icons.timer,
+                          label: _detectedBpm > 0 ? '$_detectedBpm BPM' : 'TAP',
+                          onTap: _tapTempo,
+                          colors: colors,
+                          isActive: _detectedBpm > 0,
+                        ),
+                        _buildPerformanceControl(
+                          icon: Icons.close_fullscreen,
+                          label: 'SAIR',
+                          onTap: _togglePerformanceMode,
+                          colors: colors,
+                          isDanger: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPerformanceControl({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required ColorScheme colors,
+    bool isActive = false,
+    bool isDanger = false,
+  }) {
+    final color = isDanger ? Colors.red : isActive ? colors.primary : Colors.white;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+        if (_isPerformanceMode) _startPerformanceControlsTimer();
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? colors.primary.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color.withOpacity(0.5),
+                width: 2,
+              ),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1137,6 +1399,20 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                   icon: Icons.menu_book,
                   label: 'Dicionário',
                   onTap: _showChordsDictionaryDialog,
+                ),
+
+                _buildSidebarTile(
+                  icon: Icons.fullscreen,
+                  label: 'Palco',
+                  onTap: _togglePerformanceMode,
+                  isActive: _isPerformanceMode,
+                ),
+
+                _buildSidebarTile(
+                  icon: Icons.timer,
+                  label: _detectedBpm > 0 ? '$_detectedBpm' : 'Tap',
+                  onTap: _tapTempo,
+                  isActive: _detectedBpm > 0,
                 ),
               ],
             ),
@@ -1530,7 +1806,16 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
                           .replaceAll('-', 'm')
                           .replaceAll('+', 'aug')
                           .split('/')[0];
-                          
+
+    if (instrument == 'guitar') {
+      return NativeChordDiagram(
+        key: ValueKey('${cleanChord}_$instrument'),
+        chordName: cleanChord,
+        width: 120,
+        height: 140,
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
@@ -1540,7 +1825,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
         borderRadius: BorderRadius.circular(4),
         child: ChordApiViewer(
           key: ValueKey('${cleanChord}_$instrument'),
-          chord: cleanChord, 
+          chord: cleanChord,
           instrument: instrument,
         ),
       ),
@@ -1580,58 +1865,99 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
 
   Widget _buildTomBadge() {
-    String tomDisplay = '';
-    if (_parsedSong.title.toUpperCase().contains('UMA NOVA HISTÓRIA')) {
-      final currentKey = ChordTransposer.transpose('F#m', _transposeSteps.value);
-      final shapeKey = ChordTransposer.transpose('Em', _transposeSteps.value);
-      tomDisplay = '$currentKey (Original, capo 2ª casa, forma de $shapeKey)';
-      if (_transposeSteps.value != 0) {
-        final offsetSign = _transposeSteps.value > 0 ? '+${_transposeSteps.value}' : '${_transposeSteps.value}';
-        tomDisplay = '$currentKey (Original: F#m, capo 2ª casa, forma de $shapeKey | $offsetSign)';
-      }
-    } else {
-      final originalKey = _parsedSong.key.isNotEmpty ? _parsedSong.key : 'C';
-      final currentKey = ChordTransposer.transpose(originalKey, _transposeSteps.value);
-      
-      String capoText = '';
-      if (_parsedSong.capo.isNotEmpty) {
-        capoText = 'capo ${_parsedSong.capo}ª casa';
-        if (_parsedSong.shape.isNotEmpty) {
-          final shapeTransposed = ChordTransposer.transpose(_parsedSong.shape, _transposeSteps.value);
-          capoText += ', forma de $shapeTransposed';
-        }
-      }
-      
-      tomDisplay = capoText.isNotEmpty ? '$currentKey ($capoText)' : currentKey;
-      if (_transposeSteps.value != 0) {
-        final offsetSign = _transposeSteps.value > 0 ? '+${_transposeSteps.value}' : '${_transposeSteps.value}';
-        if (capoText.isNotEmpty) {
-          tomDisplay = '$currentKey ($capoText | Tom Original: $originalKey | $offsetSign)';
-        } else {
-          tomDisplay = '$currentKey (Tom Original: $originalKey | $offsetSign)';
-        }
+    final originalKey = _parsedSong.key.isNotEmpty ? _parsedSong.key : 'C';
+    final currentKey = ChordTransposer.transpose(originalKey, _transposeSteps.value);
+
+    String capoText = '';
+    String shapeText = '';
+    if (_parsedSong.capo.isNotEmpty) {
+      final originalCapo = int.tryParse(_parsedSong.capo) ?? 0;
+      final newCapo = (originalCapo + _transposeSteps.value).clamp(0, 12);
+      capoText = newCapo > 0 ? '$newCapo' : '';
+      if (_parsedSong.shape.isNotEmpty) {
+        shapeText = ChordTransposer.transpose(_parsedSong.shape, _transposeSteps.value);
       }
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE65100), // Solid deep orange
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            'TOM: ',
-            style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13),
+    final hasTransposed = _transposeSteps.value != 0;
+    final offsetSign = _transposeSteps.value > 0 ? '+${_transposeSteps.value}' : '${_transposeSteps.value}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE65100),
+            borderRadius: BorderRadius.circular(6),
           ),
-          Text(
-            tomDisplay,
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'TOM: ',
+                style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 13),
+              ),
+              Text(
+                currentKey,
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+              ),
+              if (hasTransposed) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$originalKey $offsetSign',
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+        if (capoText.isNotEmpty || shapeText.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B5E20),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.music_note, color: Colors.white, size: 14),
+                  const SizedBox(width: 6),
+                  Text(
+                    'CAPO ${capoText}ª casa',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      fontSize: 12,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  if (shapeText.isNotEmpty) ...[
+                    Text(
+                      '  forma de $shapeText',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 

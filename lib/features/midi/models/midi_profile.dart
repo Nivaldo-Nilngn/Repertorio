@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class MidiCommand {
   final int command;
   final int noteOrCc;
@@ -35,7 +33,7 @@ class MidiCommand {
 class MidiProfile {
   final String id;
   final String name;
-  final Map<String, MidiCommand> mappings;
+  final Map<String, List<MidiCommand>> mappings;
   final String? inputId;
   final String? outputId;
   final int channel;
@@ -52,7 +50,7 @@ class MidiProfile {
   MidiProfile copyWith({
     String? id,
     String? name,
-    Map<String, MidiCommand>? mappings,
+    Map<String, List<MidiCommand>>? mappings,
     String? inputId,
     String? outputId,
     int? channel,
@@ -71,7 +69,9 @@ class MidiProfile {
     return {
       'id': id,
       'name': name,
-      'mappings': mappings.map((k, v) => MapEntry(k, v.toJson())),
+      'mappings': mappings.map(
+        (k, v) => MapEntry(k, v.map((cmd) => cmd.toJson()).toList()),
+      ),
       'inputId': inputId,
       'outputId': outputId,
       'channel': channel,
@@ -80,16 +80,25 @@ class MidiProfile {
 
   factory MidiProfile.fromJson(Map<String, dynamic> json) {
     final mappingsJson = json['mappings'] as Map<String, dynamic>? ?? {};
-    final mappings = mappingsJson.map(
-      (k, v) => MapEntry(k, MidiCommand.fromJson(Map<String, dynamic>.from(v as Map))),
-    );
+    final mappings = <String, List<MidiCommand>>{};
+    
+    mappingsJson.forEach((k, v) {
+      try {
+        if (v is List) {
+          mappings[k] = v.map((cmd) => MidiCommand.fromJson(Map<String, dynamic>.from(cmd as Map))).toList();
+        } else if (v is Map) {
+          mappings[k] = [MidiCommand.fromJson(Map<String, dynamic>.from(v))];
+        }
+      } catch (_) {}
+    });
+    
     return MidiProfile(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: json['id'] as String? ?? 'unknown',
+      name: json['name'] as String? ?? 'Perfil',
       mappings: mappings,
       inputId: json['inputId']?.toString(),
       outputId: json['outputId']?.toString(),
-      channel: json['channel'] != null ? int.tryParse(json['channel'].toString()) ?? 0 : 0,
+      channel: json['channel'] is int ? json['channel'] as int : (json['channel'] != null ? int.tryParse(json['channel'].toString()) ?? 0 : 0),
     );
   }
 }

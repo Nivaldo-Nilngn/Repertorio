@@ -222,8 +222,11 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
         ref.read(selectedSongIdProvider.notifier).select(song.id);
         ref.read(isEditorVisibleProvider.notifier).state = false;
         
-        if (_selectedFolderId != null) {
-          ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.prepare);
+        // Retorna para a aba de onde o editor foi aberto
+        final originTab = ref.read(editorOriginTabProvider);
+        if (originTab != null) {
+          ref.read(sidebarTabProvider.notifier).setTab(originTab);
+          ref.read(editorOriginTabProvider.notifier).clear(); // limpa após uso
         }
       }
     } catch (e) {

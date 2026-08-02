@@ -1541,6 +1541,9 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                                 if (value == 'edit') {
                                   ref.read(selectedSongIdProvider.notifier).select(song.id);
                                   ref.read(editingChordProProvider.notifier).state = song.content;
+                                  // Memoriza aba atual para restaurar ao salvar
+                                  ref.read(editorOriginTabProvider.notifier).setOrigin(
+                                      ref.read(sidebarTabProvider));
                                   ref.read(isEditorVisibleProvider.notifier).state = true;
                                   ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
                                   ref.read(songFilterProvider.notifier).setFolder(_activeSetlist?.id);
@@ -1877,6 +1880,9 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                               final matchingSong = songs.firstWhere((s) => s.title == item.title);
                               ref.read(selectedSongIdProvider.notifier).select(matchingSong.id);
                               ref.read(editingChordProProvider.notifier).state = matchingSong.content;
+                              // Memoriza aba atual para restaurar ao salvar
+                              ref.read(editorOriginTabProvider.notifier).setOrigin(
+                                  ref.read(sidebarTabProvider));
                               ref.read(isEditorVisibleProvider.notifier).state = true;
                               ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
                               ref.read(songFilterProvider.notifier).setFolder(_activeSetlist?.id);

@@ -624,6 +624,13 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
         );
         ref.read(selectedSongIdProvider.notifier).select(song.id);
         ref.read(isEditorVisibleProvider.notifier).state = false;
+
+        // Retorna para a aba de onde o editor foi aberto
+        final originTab = ref.read(editorOriginTabProvider);
+        if (originTab != null) {
+          ref.read(sidebarTabProvider.notifier).setTab(originTab);
+          ref.read(editorOriginTabProvider.notifier).clear(); // limpa após uso
+        }
       }
     } catch (e) {
       if (mounted) {

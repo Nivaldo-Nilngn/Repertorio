@@ -238,14 +238,20 @@ class MidiSettingsDialog extends ConsumerWidget {
     MidiNotifier notifier,
     ColorScheme colors,
   ) {
-    final mapping = activeProfile.mappings[actionKey];
+    final mappings = activeProfile.mappings[actionKey];
     final isLearningThis = state.isLearning && state.learningAction == actionKey;
+    final hasMappings = mappings != null && mappings.isNotEmpty;
+    final mappingList = mappings ?? [];
 
     String mappingText = '[Nenhum botão atribuído]';
     if (isLearningThis) {
       mappingText = 'Aguardando sinal MIDI...';
-    } else if (mapping != null) {
-      mappingText = '[Sinal ${mapping.command}, Nota/CC ${mapping.noteOrCc}]';
+    } else if (hasMappings) {
+      if (mappingList.length == 1) {
+        mappingText = '[Sinal ${mappingList[0].command}, Nota/CC ${mappingList[0].noteOrCc}]';
+      } else {
+        mappingText = '[${mappingList.length} mapeamentos]';
+      }
     }
 
     return Container(
@@ -260,63 +266,89 @@ class MidiSettingsDialog extends ConsumerWidget {
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: isLearningThis ? colors.primary : colors.primary.withOpacity(0.7)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isLearningThis ? colors.primary : colors.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, size: 20, color: isLearningThis ? colors.primary : colors.primary.withOpacity(0.7)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isLearningThis ? colors.primary : colors.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      mappingText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isLearningThis ? colors.primary.withOpacity(0.8) : colors.onSurfaceVariant,
+                        fontStyle: isLearningThis ? FontStyle.italic : FontStyle.normal,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  mappingText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isLearningThis ? colors.primary.withOpacity(0.8) : colors.onSurfaceVariant,
-                    fontStyle: isLearningThis ? FontStyle.italic : FontStyle.normal,
+              ),
+              const SizedBox(width: 4),
+              if (isLearningThis)
+                FilledButton.tonal(
+                  onPressed: () => notifier.cancelLearning(),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.errorContainer,
+                    foregroundColor: colors.onErrorContainer,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(60, 32),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                )
+              else
+                OutlinedButton(
+                  onPressed: () => notifier.startLearning(actionKey),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: colors.primary.withOpacity(0.5)),
+                    foregroundColor: colors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(60, 32),
+                  ),
+                  child: Text(hasMappings ? 'ADICIONAR' : 'MAPEAR', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 ),
-              ],
-            ),
+            ],
           ),
-          const SizedBox(width: 4),
-          if (isLearningThis)
-            FilledButton.tonal(
-              onPressed: () => notifier.cancelLearning(),
-              style: FilledButton.styleFrom(
-                backgroundColor: colors.errorContainer,
-                foregroundColor: colors.onErrorContainer,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(60, 32),
-              ),
-              child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
-            )
-          else
-            OutlinedButton(
-              onPressed: () => notifier.startLearning(actionKey),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colors.primary.withOpacity(0.5)),
-                foregroundColor: colors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                minimumSize: const Size(60, 32),
-              ),
-              child: const Text('MAPEAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          if (hasMappings && mappingList.length > 1) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: mappings.map((cmd) {
+                return Chip(
+                  label: Text(
+                    'Cmd ${cmd.command} • N/CC ${cmd.noteOrCc}',
+                    style: TextStyle(fontSize: 10, color: colors.onSurface),
+                  ),
+                  deleteIcon: Icon(Icons.close, size: 14, color: colors.error),
+                  onDeleted: () => notifier.removeSingleMapping(actionKey, cmd),
+                  backgroundColor: colors.surfaceContainerHighest,
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
             ),
+          ],
         ],
       ),
     );

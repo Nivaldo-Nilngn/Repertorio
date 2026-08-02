@@ -118,6 +118,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                       onTap: () {
                         Navigator.pop(context);
                         ref.read(selectedSongIdProvider.notifier).select(null);
+                        // Memoriza a aba atual para retornar ao salvar
+                        ref.read(editorOriginTabProvider.notifier).setOrigin(
+                            ref.read(sidebarTabProvider));
                         final filter = ref.read(songFilterProvider);
                         final initialArtist = filter.artist ?? 'Artista';
                         ref.read(editingChordProProvider.notifier).state = '''{title: Nova Música}
@@ -130,10 +133,6 @@ Coloque sua [C]letra aqui
 E os acordes [G]entre colchetes
 ''';
                         ref.read(isEditorVisibleProvider.notifier).state = true;
-                        if (ref.read(sidebarTabProvider) != SidebarTab.prepare) {
-                          ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                          ref.read(songFilterProvider.notifier).clearExceptFolder();
-                        }
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -232,16 +231,13 @@ E os acordes [G]entre colchetes
                             // Update editor state
                             ref.read(selectedSongIdProvider.notifier).select(null);
                             ref.read(editingChordProProvider.notifier).state = chordPro;
+                            // Memoriza a aba atual para retornar ao salvar
+                            ref.read(editorOriginTabProvider.notifier).setOrigin(
+                                ref.read(sidebarTabProvider));
                             ref.read(isEditorVisibleProvider.notifier).state = true;
                             
                             if (mounted) {
                               Navigator.pop(context);
-                              // Switch to songs tab and clear filters
-                              if (ref.read(sidebarTabProvider) != SidebarTab.prepare) {
-                                ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs);
-                                ref.read(songFilterProvider.notifier).clearExceptFolder();
-                              }
-                              
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Importado com sucesso!'), backgroundColor: Colors.green),
                               );

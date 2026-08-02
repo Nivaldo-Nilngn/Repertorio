@@ -27,22 +27,31 @@ class MidiStorageService {
             final map = Map<String, dynamic>.from(data);
             final List<MidiProfile> parsedProfiles = [];
             for (final entry in map.values) {
-              if (entry is Map) {
-                parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
+              try {
+                if (entry is Map) {
+                  parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
+                }
+              } catch (e) {
+                print('Erro ao parsear perfil MIDI: $e');
               }
             }
             if (parsedProfiles.isNotEmpty) {
-              // Atualizar cache local
               html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
               return parsedProfiles;
             }
           } else if (data is List) {
             final list = List<dynamic>.from(data);
-            final parsedProfiles = list.where((e) => e != null).map((e) {
-              return MidiProfile.fromJson(Map<String, dynamic>.from(e as Map));
-            }).toList();
+            final parsedProfiles = <MidiProfile>[];
+            for (final e in list) {
+              try {
+                if (e != null && e is Map) {
+                  parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(e)));
+                }
+              } catch (e2) {
+                print('Erro ao parsear perfil MIDI (lista): $e2');
+              }
+            }
             if (parsedProfiles.isNotEmpty) {
-              // Atualizar cache local
               html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
               return parsedProfiles;
             }
