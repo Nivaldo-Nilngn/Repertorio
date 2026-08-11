@@ -1,5 +1,9 @@
+// ignore_for_file: avoid_print
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/theme/prefs_sync_domain.dart';
+import '../../../core/theme/prefs_sync_state.dart';
 import '../../../core/theme/settings_provider.dart';
 import '../../songs/models/song_setlist.dart';
 
@@ -171,12 +175,29 @@ class IsTopMenuNotifier extends Notifier<bool> {
   @override
   bool build() {
     _prefs = ref.watch(sharedPreferencesProvider);
-    return _prefs.getBool('isTopMenu') ?? false;
+    return _prefs.getBool(PrefsSyncKeys.isTopMenu) ?? false;
   }
 
-  void toggle() {
+  Future<void> toggle() async {
     state = !state;
-    _prefs.setBool('isTopMenu', state);
+    await _setBool(PrefsSyncKeys.isTopMenu, state);
+  }
+
+  Future<void> _setBool(String key, bool value) async {
+    await _prefs.setBool(key, value);
+    await _pushPrefs({key: value});
+  }
+
+  Future<void> _pushPrefs(Map<String, dynamic> values) async {
+    final service = ref.read(userSettingsSyncServiceProvider);
+    if (!service.isSignedIn) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (!ref.read(prefsSyncActiveProvider).shouldPush(uid)) return;
+    try {
+      await service.writePrefs(values);
+    } catch (e) {
+      print('Erro ao salvar preferências no Firebase: $e');
+    }
   }
 }
 
@@ -190,10 +211,10 @@ class PinnedArtistsNotifier extends Notifier<List<String>> {
   @override
   List<String> build() {
     _prefs = ref.watch(sharedPreferencesProvider);
-    return _prefs.getStringList('pinned_artists') ?? [];
+    return _prefs.getStringList(PrefsSyncKeys.pinnedArtists) ?? [];
   }
 
-  void toggle(String artist) {
+  Future<void> toggle(String artist) async {
     final newState = List<String>.from(state);
     if (newState.contains(artist)) {
       newState.remove(artist);
@@ -201,10 +222,10 @@ class PinnedArtistsNotifier extends Notifier<List<String>> {
       newState.add(artist);
     }
     state = newState;
-    _prefs.setStringList('pinned_artists', newState);
+    await _persistPinned(newState);
   }
 
-  void reorder(int oldIndex, int newIndex) {
+  Future<void> reorder(int oldIndex, int newIndex) async {
     if (oldIndex < newIndex) {
       newIndex -= 1;
     }
@@ -212,7 +233,24 @@ class PinnedArtistsNotifier extends Notifier<List<String>> {
     final artist = newState.removeAt(oldIndex);
     newState.insert(newIndex, artist);
     state = newState;
-    _prefs.setStringList('pinned_artists', newState);
+    await _persistPinned(newState);
+  }
+
+  Future<void> _persistPinned(List<String> list) async {
+    await _prefs.setStringList(PrefsSyncKeys.pinnedArtists, list);
+    await _pushPrefs({PrefsSyncKeys.pinnedArtists: list});
+  }
+
+  Future<void> _pushPrefs(Map<String, dynamic> values) async {
+    final service = ref.read(userSettingsSyncServiceProvider);
+    if (!service.isSignedIn) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (!ref.read(prefsSyncActiveProvider).shouldPush(uid)) return;
+    try {
+      await service.writePrefs(values);
+    } catch (e) {
+      print('Erro ao salvar preferências no Firebase: $e');
+    }
   }
 }
 

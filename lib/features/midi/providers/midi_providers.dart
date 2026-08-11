@@ -6,13 +6,13 @@ import '../services/midi_storage_service.dart';
 import '../services/midi_web_service.dart';
 
 import 'package:firebase_database/firebase_database.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../../core/theme/prefs_sync_state.dart';
 
 final midiStorageServiceProvider = Provider<MidiStorageService>((ref) {
-  final auth = ref.watch(firebaseAuthProvider);
+  final uid = ref.watch(currentUserIdProvider);
   return MidiStorageService(
     database: FirebaseDatabase.instance,
-    userId: auth.currentUser?.uid,
+    userId: uid,
   );
 });
 
@@ -111,8 +111,13 @@ class MidiNotifier extends Notifier<MidiState> {
   }
 
   Future<void> _init() async {
+    // Cancelar assinaturas anteriores antes de re-inicializar (troca de usuário)
+    _midiSub?.cancel();
+    _stateChangeSub?.cancel();
+
     final profiles = await _storage.loadProfiles();
-    final activeProfileId = await _storage.loadActiveProfileId() ?? profiles.first.id;
+    final activeProfileId =
+        await _storage.loadActiveProfileId() ?? (profiles.isNotEmpty ? profiles.first.id : 'default');
 
     final isSupported = await _midiService.initialize();
     

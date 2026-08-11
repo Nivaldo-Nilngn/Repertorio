@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/midi_providers.dart';
 import '../models/midi_profile.dart';
-import '../services/midi_web_service.dart' as web_midi;
 
 class MidiSettingsPanel extends ConsumerWidget {
   const MidiSettingsPanel({super.key});
@@ -15,14 +14,47 @@ class MidiSettingsPanel extends ConsumerWidget {
     final isMobile = MediaQuery.of(context).size.width < 800;
 
     if (!state.isSupported) {
+      // Sem API Web MIDI: mostra os perfis normalmente (podem existir na
+      // nuvem), apenas substitui o bloco de dispositivos por um aviso.
       return Padding(
         padding: EdgeInsets.all(isMobile ? 16.0 : 32.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Controle MIDI', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            const Text('A API Web MIDI não é suportada neste navegador.'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: colors.outline.withOpacity(0.2)),
+              ),
+              child: const Text(
+                'A API Web MIDI não é suportada neste navegador. Os perfis salvos na nuvem são exibidos abaixo.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Perfil Ativo', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white70)),
+            const SizedBox(height: 8),
+            if (state.profiles.isEmpty)
+              const Text('Nenhum perfil MIDI ainda.', style: TextStyle(fontSize: 13)),
+            ...state.profiles.map((p) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Icon(p.id == state.activeProfileId ? Icons.radio_button_checked : Icons.radio_button_off,
+                      size: 18, color: p.id == state.activeProfileId ? colors.primary : colors.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text(p.name, style: const TextStyle(fontSize: 14)),
+                  if (p.id == state.activeProfileId) ...[
+                    const SizedBox(width: 8),
+                    const Text('(ativo)', style: TextStyle(fontSize: 12, color: Colors.greenAccent)),
+                  ],
+                ],
+              ),
+            )),
           ],
         ),
       );

@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'core/theme/settings_provider.dart';
+import 'core/theme/user_settings_sync.dart';
 import 'features/manager/screens/manager_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -101,6 +102,8 @@ class KordApp extends ConsumerWidget {
     final authState = ref.watch(authStateProvider);
     final appThemeType = ref.watch(appThemeProvider);
     final settings = ref.watch(settingsProvider);
+    // Mantém o coordinator vivo: ele puxa/planta as prefs do RTDB no login
+    ref.watch(userSettingsSyncCoordinatorProvider);
 
     return MaterialApp(
       title: 'KordApp',

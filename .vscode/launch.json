@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "KordApp Web (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "preLaunchTask": "Gerar dart defines do .env",
+      "toolArgs": ["--dart-define-from-file=.env.json"]
+    }
+  ]
+}

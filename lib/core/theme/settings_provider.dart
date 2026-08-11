@@ -1,22 +1,16 @@
+// ignore_for_file: avoid_print
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_database/firebase_database.dart';
-import '../../features/auth/providers/auth_provider.dart';
+import 'prefs_sync_domain.dart';
+import 'prefs_sync_state.dart';
 
 // Provider global para acessar o SharedPreferences
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('sharedPreferencesProvider must be overridden in main.dart');
 });
 
-// Chaves para as configurações persistidas
-const _kThemeKey = 'theme_type';
-const _kCustomThemeColorKey = 'custom_theme_color';
-const _kCustomBgColorKey = 'custom_bg_color';
-const _kCustomTextColorKey = 'custom_text_color';
-const _kCustomChordColorKey = 'custom_chord_color';
-const _kCustomLyricColorKey = 'custom_lyric_color';
-const _kFontSizeKey = 'default_font_size';
-const _kFontFamilyKey = 'font_family';
+// Chaves para as configurações persistidas (definidas em PrefsSyncKeys)
 
 class AppSettings {
   final double defaultFontSize;
@@ -65,62 +59,75 @@ class SettingsNotifier extends Notifier<AppSettings> {
   AppSettings build() {
     _prefs = ref.watch(sharedPreferencesProvider);
     return AppSettings(
-      defaultFontSize: _prefs.getDouble(_kFontSizeKey) ?? 14.0,
-      customThemeColorHex: _prefs.getString(_kCustomThemeColorKey),
-      customBgColorHex: _prefs.getString(_kCustomBgColorKey),
-      customTextColorHex: _prefs.getString(_kCustomTextColorKey),
-      customChordColorHex: _prefs.getString(_kCustomChordColorKey),
-      customLyricColorHex: _prefs.getString(_kCustomLyricColorKey),
-      fontFamily: _prefs.getString(_kFontFamilyKey),
+      defaultFontSize: _prefs.getDouble(PrefsSyncKeys.fontSize) ?? 14.0,
+      customThemeColorHex: _prefs.getString(PrefsSyncKeys.customThemeColor),
+      customBgColorHex: _prefs.getString(PrefsSyncKeys.customBgColor),
+      customTextColorHex: _prefs.getString(PrefsSyncKeys.customTextColor),
+      customChordColorHex: _prefs.getString(PrefsSyncKeys.customChordColor),
+      customLyricColorHex: _prefs.getString(PrefsSyncKeys.customLyricColor),
+      fontFamily: _prefs.getString(PrefsSyncKeys.fontFamily),
     );
   }
 
   Future<void> setFontSize(double size) async {
     state = state.copyWith(defaultFontSize: size);
-    await _prefs.setDouble(_kFontSizeKey, size);
+    await _setDouble(PrefsSyncKeys.fontSize, size);
   }
 
   Future<void> setCustomThemeColorHex(String hex) async {
     state = state.copyWith(customThemeColorHex: hex);
-    await _prefs.setString(_kCustomThemeColorKey, hex);
+    await _setString(PrefsSyncKeys.customThemeColor, hex);
   }
 
   Future<void> setCustomBgColorHex(String hex) async {
     state = state.copyWith(customBgColorHex: hex);
-    await _prefs.setString(_kCustomBgColorKey, hex);
+    await _setString(PrefsSyncKeys.customBgColor, hex);
   }
 
   Future<void> setCustomTextColorHex(String hex) async {
     state = state.copyWith(customTextColorHex: hex);
-    await _prefs.setString(_kCustomTextColorKey, hex);
+    await _setString(PrefsSyncKeys.customTextColor, hex);
   }
 
   Future<void> setCustomChordColorHex(String hex) async {
     state = state.copyWith(customChordColorHex: hex);
-    await _prefs.setString(_kCustomChordColorKey, hex);
+    await _setString(PrefsSyncKeys.customChordColor, hex);
   }
 
   Future<void> setCustomLyricColorHex(String hex) async {
     state = state.copyWith(customLyricColorHex: hex);
-    await _prefs.setString(_kCustomLyricColorKey, hex);
+    await _setString(PrefsSyncKeys.customLyricColor, hex);
   }
 
   Future<void> setFontFamily(String font) async {
     state = state.copyWith(fontFamily: font);
-    await _prefs.setString(_kFontFamilyKey, font);
+    await _setString(PrefsSyncKeys.fontFamily, font);
   }
 
   Future<void> setViewMode(String mode) async {
-    await _prefs.setString('last_song_view_mode', mode);
-    final uid = ref.read(firebaseAuthProvider).currentUser?.uid;
-    if (uid != null) {
-      try {
-        await FirebaseDatabase.instance.ref('users/$uid/settings').update({
-          'last_song_view_mode': mode,
-        });
-      } catch (e) {
-        print('Erro ao salvar viewMode no Firebase: $e');
-      }
+    await _prefs.setString(PrefsSyncKeys.lastSongViewMode, mode);
+    await _pushPrefs({PrefsSyncKeys.lastSongViewMode: mode});
+  }
+
+  Future<void> _setString(String key, String value) async {
+    await _prefs.setString(key, value);
+    await _pushPrefs({key: value});
+  }
+
+  Future<void> _setDouble(String key, double value) async {
+    await _prefs.setDouble(key, value);
+    await _pushPrefs({key: value});
+  }
+
+  Future<void> _pushPrefs(Map<String, dynamic> values) async {
+    final service = ref.read(userSettingsSyncServiceProvider);
+    if (!service.isSignedIn) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (!ref.read(prefsSyncActiveProvider).shouldPush(uid)) return;
+    try {
+      await service.writePrefs(values);
+    } catch (e) {
+      print('Erro ao salvar preferências no Firebase: $e');
     }
   }
 }

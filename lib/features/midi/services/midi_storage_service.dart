@@ -11,8 +11,17 @@ class MidiStorageService {
 
   MidiStorageService({required this.database, this.userId});
 
+  bool get isSignedIn => userId != null;
+
   static const _storageKey = 'kordapp_midi_profiles';
   static const _activeProfileKey = 'kordapp_active_midi_profile_id';
+
+  // Evita re-seed indevido: só tenta subir os perfis locais se a nuvem
+  // realmente não existir e ainda não tivermos tentado nesta sessão.
+  bool _seeded = false;
+
+  // Diagnóstico: quantos perfis vieram do snapshot da nuvem.
+  int _cloudParsed = 0;
 
   DatabaseReference? get _profilesRef => userId != null ? database.ref('users/$userId/midiProfiles') : null;
   DatabaseReference? get _settingsRef => userId != null ? database.ref('users/$userId/settings') : null;
@@ -21,6 +30,7 @@ class MidiStorageService {
     if (_profilesRef != null) {
       try {
         final snapshot = await _profilesRef!.get();
+        print('[MIDI] loadProfiles firebase snapshot.exists=${snapshot.exists}, value=${snapshot.value}');
         if (snapshot.exists && snapshot.value != null) {
           final data = snapshot.value;
           if (data is Map) {
@@ -36,9 +46,14 @@ class MidiStorageService {
               }
             }
             if (parsedProfiles.isNotEmpty) {
+              _seeded = true;
+              _cloudParsed = parsedProfiles.length;
               html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
+              print('[MIDI] loadProfiles cloud -> ${parsedProfiles.map((p) => p.name).toList()}');
               return parsedProfiles;
             }
+            // Nuvem existia mas vazia/ilegível: considera "já iniciada"
+            _seeded = true;
           } else if (data is List) {
             final list = List<dynamic>.from(data);
             final parsedProfiles = <MidiProfile>[];
@@ -52,27 +67,40 @@ class MidiStorageService {
               }
             }
             if (parsedProfiles.isNotEmpty) {
+              _seeded = true;
+              _cloudParsed = parsedProfiles.length;
               html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
+              print('[MIDI] loadProfiles list-cloud -> ${parsedProfiles.map((p) => p.name).toList()}');
               return parsedProfiles;
             }
+            _seeded = true;
           }
+        } else {
+          // Snapshot sem dados: ainda não marcamos como vazio definitivo.
+          // O seed só roda se realmente não houver nada na nuvem.
         }
       } catch (e) {
         print('Erro ao carregar perfis MIDI do Firebase: $e');
       }
     }
 
-    // Fallback para o local storage
+    // Fallback para o local storage — sem re-seed nesta sessão
     final localProfiles = _loadFromLocalStorage();
-    
-    // Se o usuário está logado mas não tinha perfis no Firebase, sincroniza os locais pra nuvem
-    if (_profilesRef != null) {
+
+    print('[MIDI] loadProfiles -> userId=$userId, cloudProfiles=$_cloudParsed, localProfiles=${localProfiles.map((p) => p.name).toList()}');
+
+    // Sobe os locais pra nuvem apenas na primeira vez (nuvem de fato vazia)
+    if (_profilesRef != null && !_seeded) {
       final isModified = localProfiles.length > 1 || (localProfiles.isNotEmpty && localProfiles.first.mappings.isNotEmpty);
       if (isModified) {
+        print('[MIDI] Seed: subindo ${localProfiles.length} perfis locais pra nuvem (userId=$userId)');
+        _seeded = true;
         saveProfiles(localProfiles);
+      } else {
+        print('[MIDI] Sem seed: nuvem vazia e local sem perfis modificados.');
       }
     }
-    
+
     return localProfiles;
   }
 

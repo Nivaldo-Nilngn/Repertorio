@@ -70,6 +70,13 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   final List<DateTime> _tapTimes = [];
   int _detectedBpm = 0;
 
+  // Metronome
+  bool _metronomeActive = false;
+  int _metronomeBpm = 100;
+  Timer? _metronomeTimer;
+  bool _metronomeFlash = false;
+  int _metronomeBeat = 0;
+
   void _startFabTimer() {
     _fabTimer?.cancel();
     _fabTimer = Timer(const Duration(seconds: 3), () {

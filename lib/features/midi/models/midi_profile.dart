@@ -79,18 +79,49 @@ class MidiProfile {
   }
 
   factory MidiProfile.fromJson(Map<String, dynamic> json) {
-    final mappingsJson = json['mappings'] as Map<String, dynamic>? ?? {};
-    final mappings = <String, List<MidiCommand>>{};
-    
-    mappingsJson.forEach((k, v) {
-      try {
-        if (v is List) {
-          mappings[k] = v.map((cmd) => MidiCommand.fromJson(Map<String, dynamic>.from(cmd as Map))).toList();
-        } else if (v is Map) {
-          mappings[k] = [MidiCommand.fromJson(Map<String, dynamic>.from(v))];
+    // O RTDB devolve mapas com operadores Object? (não Map<String, dynamic>).
+    // Normaliza todos os valores para strings preservando o conteúdo.
+    final mapped = json.map((k, v) => MapEntry(k.toString(), v));
+    Map<dynamic, dynamic>? rawMappings;
+    final raw = mapped['mappings'];
+    if (raw is Map) {
+      rawMappings = raw.cast<dynamic, dynamic>();
+    } else if (raw is List) {
+      rawMappings = {};
+      for (final item in raw) {
+        if (item is Map) {
+          final m = item.cast<dynamic, dynamic>();
+          rawMappings[rawMappings.length.toString()] = m;
         }
-      } catch (_) {}
-    });
+      }
+    }
+
+    final mappings = <String, List<MidiCommand>>{};
+    if (rawMappings != null) {
+      rawMappings.forEach((k, v) {
+        try {
+          if (v is Map) {
+            // Um EditorCommand por chave (objeto único)
+            final entryMap = <String, dynamic>{};
+            v.forEach((kk, vv) => entryMap[kk.toString()] = vv);
+            final existing = mappings[k.toString()] ?? <MidiCommand>[];
+            existing.add(MidiCommand.fromJson(entryMap));
+            mappings[k.toString()] = existing;
+          } else if (v is List) {
+            // Lista de comandos para a mesma ação
+            final existing = mappings[k.toString()] ?? <MidiCommand>[];
+            for (final item in v) {
+              if (item is Map) {
+                final entryMap = <String, dynamic>{};
+                item.forEach((kk, vv) => entryMap[kk.toString()] = vv);
+                existing.add(MidiCommand.fromJson(entryMap));
+              }
+            }
+            mappings[k.toString()] = existing;
+          }
+        } catch (_) {}
+      });
+    }
     
     return MidiProfile(
       id: json['id'] as String? ?? 'unknown',
