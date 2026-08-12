@@ -1758,7 +1758,21 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Acordes da Música', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Acordes da Música', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    tooltip: 'Ocultar Painel',
+                    onPressed: () {
+                      setState(() {
+                        _showChordsPanel = false;
+                      });
+                    },
+                  ),
+                ],
+              ),
               const SizedBox(height: 24),
               InkWell(
                 onTap: () {
@@ -2009,7 +2023,26 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
               ],
             ),
           ),
-          
+          const SizedBox(width: 16),
+          // Modo Palco Button
+          Tooltip(
+            message: 'Modo Palco (Fullscreen Imersivo)',
+            child: FilledButton.icon(
+              onPressed: _togglePerformanceMode,
+              icon: const Icon(Icons.fullscreen, size: 20),
+              label: const Text(
+                'Modo Palco',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
         ],
       ),
     );
