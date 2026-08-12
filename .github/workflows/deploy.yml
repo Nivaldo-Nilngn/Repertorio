@@ -33,12 +33,8 @@ jobs:
             --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }} \
             --dart-define=FIREBASE_DATABASE_URL=${{ secrets.FIREBASE_DATABASE_URL }}
 
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
       - name: Deploy to Firebase Hosting (kordapp)
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          projectId: songbooknil
-          target: kordapp
-          channelId: live
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: firebase deploy --only hosting:kordapp --token "${{ secrets.FIREBASE_TOKEN }}"
