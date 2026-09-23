@@ -31,12 +31,12 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
-    appId: String.fromEnvironment('FIREBASE_APP_ID'),
-    messagingSenderId: String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID'),
-    projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-    storageBucket: String.fromEnvironment('FIREBASE_STORAGE_BUCKET'),
-    databaseURL: String.fromEnvironment('FIREBASE_DATABASE_URL'),
+    apiKey: 'AIzaSyAfJHJkO4YZZk6_TdQ5O1AfLVn1LmKUujg',
+    appId: '1:367329738936:android:1039e5c07842c508d0744d',
+    messagingSenderId: '367329738936',
+    projectId: 'songbooknil',
+    storageBucket: 'songbooknil.firebasestorage.app',
+    databaseURL: 'https://songbooknil-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

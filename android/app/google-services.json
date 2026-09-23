@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "367329738936",
+    "firebase_url": "https://songbooknil-default-rtdb.firebaseio.com",
+    "project_id": "songbooknil",
+    "storage_bucket": "songbooknil.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:367329738936:android:1039e5c07842c508d0744d",
+        "android_client_info": {
+          "package_name": "com.nilngn.kordapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "367329738936-1bsp1421ecuddfugtgiid5ftf03hv7uf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfJHJkO4YZZk6_TdQ5O1AfLVn1LmKUujg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "367329738936-1bsp1421ecuddfugtgiid5ftf03hv7uf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
