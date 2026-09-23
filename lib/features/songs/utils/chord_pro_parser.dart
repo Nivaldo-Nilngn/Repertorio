@@ -147,7 +147,7 @@ class ChordProParser {
           'pre-chorus', 'pre-refrão', 'pre-refrao', 'pré-refrão', 'pré-refrao',
           'primeira parte', 'segunda parte', 'terceira parte', 'quarta parte'
         };
-        if (chordText.contains(' ') || chordText.length > 8 || knownSections.contains(lowerText)) {
+        if (chordText.contains(' ') || chordText.length > 8 || knownSections.contains(lowerText) || lowerText.contains('parte') || lowerText.contains('verso') || lowerText.contains('medley')) {
           lyrics += line.substring(lastMatchEnd, match.end);
           currentLyricsIndex += (match.end - lastMatchEnd);
         } else {
@@ -414,6 +414,22 @@ class SongRoadmapBuilder {
               isSectionLine = true;
               matchedTitle = bracketContent;
               break;
+            }
+          }
+          if (!isSectionLine) {
+            if (lowerBracket.contains('parte') ||
+                lowerBracket.contains('verso') ||
+                lowerBracket.contains('medley') ||
+                lowerBracket.contains('coro') ||
+                lowerBracket.contains('intro') ||
+                lowerBracket.contains('refrão') ||
+                lowerBracket.contains('refrao') ||
+                lowerBracket.contains('ponte') ||
+                lowerBracket.contains('solo') ||
+                lowerBracket.contains('final') ||
+                lowerBracket.contains('outro')) {
+              isSectionLine = true;
+              matchedTitle = bracketContent;
             }
           }
         } else {

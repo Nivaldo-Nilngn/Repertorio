@@ -1,169 +1,196 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
-
+import 'dart:async';
 import 'dart:convert';
-import 'dart:html' as html;
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/midi_profile.dart';
 
+/// Cross-platform MIDI storage service.
+///
+/// Uses [SharedPreferences] as the primary offline cache (works on web,
+/// Android, and iOS — on web, SharedPreferences internally uses localStorage).
+/// Firebase Realtime Database is used for cloud sync with a 3-second timeout
+/// so the service never hangs when the device is on an offline Wi-Fi network
+/// (e.g. the church mixer's local IP).
 class MidiStorageService {
   final FirebaseDatabase database;
   final String? userId;
+  final SharedPreferences? prefs;
 
-  MidiStorageService({required this.database, this.userId});
+  MidiStorageService({
+    required this.database,
+    this.userId,
+    this.prefs,
+  });
 
   bool get isSignedIn => userId != null;
 
-  static const _storageKey = 'kordapp_midi_profiles';
-  static const _activeProfileKey = 'kordapp_active_midi_profile_id';
+  static const _baseProfilesKey = 'kordapp_midi_profiles';
+  static const _baseActiveKey = 'kordapp_active_midi_profile_id';
 
-  // Evita re-seed indevido: só tenta subir os perfis locais se a nuvem
-  // realmente não existir e ainda não tivermos tentado nesta sessão.
-  bool _seeded = false;
+  String get _userProfilesKey =>
+      userId != null ? '${_baseProfilesKey}_$userId' : _baseProfilesKey;
+  String get _userActiveKey =>
+      userId != null ? '${_baseActiveKey}_$userId' : _baseActiveKey;
 
-  // Diagnóstico: quantos perfis vieram do snapshot da nuvem.
-  int _cloudParsed = 0;
+  DatabaseReference? get _profilesRef =>
+      userId != null ? database.ref('users/$userId/midiProfiles') : null;
+  DatabaseReference? get _settingsRef =>
+      userId != null ? database.ref('users/$userId/settings') : null;
 
-  DatabaseReference? get _profilesRef => userId != null ? database.ref('users/$userId/midiProfiles') : null;
-  DatabaseReference? get _settingsRef => userId != null ? database.ref('users/$userId/settings') : null;
+  // ─── Cache local (0ms, offline-first) ──────────────────────────────────────
 
-  Future<List<MidiProfile>> loadProfiles() async {
-    if (_profilesRef != null) {
+  List<MidiProfile> loadProfilesFromCache() {
+    // User-scoped key first, then base key as fallback for legacy data
+    String? data = prefs?.getString(_userProfilesKey);
+    data ??= prefs?.getString(_baseProfilesKey);
+
+    if (data != null && data.isNotEmpty) {
       try {
-        final snapshot = await _profilesRef!.get();
-        print('[MIDI] loadProfiles firebase snapshot.exists=${snapshot.exists}, value=${snapshot.value}');
-        if (snapshot.exists && snapshot.value != null) {
-          final data = snapshot.value;
-          if (data is Map) {
-            final map = Map<String, dynamic>.from(data);
-            final List<MidiProfile> parsedProfiles = [];
-            for (final entry in map.values) {
-              try {
-                if (entry is Map) {
-                  parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
-                }
-              } catch (e) {
-                print('Erro ao parsear perfil MIDI: $e');
-              }
-            }
-            if (parsedProfiles.isNotEmpty) {
-              _seeded = true;
-              _cloudParsed = parsedProfiles.length;
-              html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
-              print('[MIDI] loadProfiles cloud -> ${parsedProfiles.map((p) => p.name).toList()}');
-              return parsedProfiles;
-            }
-            // Nuvem existia mas vazia/ilegível: considera "já iniciada"
-            _seeded = true;
-          } else if (data is List) {
-            final list = List<dynamic>.from(data);
-            final parsedProfiles = <MidiProfile>[];
-            for (final e in list) {
-              try {
-                if (e != null && e is Map) {
-                  parsedProfiles.add(MidiProfile.fromJson(Map<String, dynamic>.from(e)));
-                }
-              } catch (e2) {
-                print('Erro ao parsear perfil MIDI (lista): $e2');
-              }
-            }
-            if (parsedProfiles.isNotEmpty) {
-              _seeded = true;
-              _cloudParsed = parsedProfiles.length;
-              html.window.localStorage[_storageKey] = jsonEncode(parsedProfiles.map((e) => e.toJson()).toList());
-              print('[MIDI] loadProfiles list-cloud -> ${parsedProfiles.map((p) => p.name).toList()}');
-              return parsedProfiles;
-            }
-            _seeded = true;
-          }
-        } else {
-          // Snapshot sem dados: ainda não marcamos como vazio definitivo.
-          // O seed só roda se realmente não houver nada na nuvem.
+        final List<dynamic> decoded = jsonDecode(data);
+        final list = decoded
+            .map((e) => MidiProfile.fromJson(e as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) {
+          print('[MIDI] loadProfilesFromCache -> ${list.length} perfis');
+          return list;
         }
       } catch (e) {
-        print('Erro ao carregar perfis MIDI do Firebase: $e');
+        print('[MIDI] Erro ao decodificar perfis locais: $e');
       }
     }
 
-    // Fallback para o local storage — sem re-seed nesta sessão
-    final localProfiles = _loadFromLocalStorage();
-
-    print('[MIDI] loadProfiles -> userId=$userId, cloudProfiles=$_cloudParsed, localProfiles=${localProfiles.map((p) => p.name).toList()}');
-
-    // Sobe os locais pra nuvem apenas na primeira vez (nuvem de fato vazia)
-    if (_profilesRef != null && !_seeded) {
-      final isModified = localProfiles.length > 1 || (localProfiles.isNotEmpty && localProfiles.first.mappings.isNotEmpty);
-      if (isModified) {
-        print('[MIDI] Seed: subindo ${localProfiles.length} perfis locais pra nuvem (userId=$userId)');
-        _seeded = true;
-        saveProfiles(localProfiles);
-      } else {
-        print('[MIDI] Sem seed: nuvem vazia e local sem perfis modificados.');
-      }
-    }
-
-    return localProfiles;
+    return const [
+      MidiProfile(id: 'default', name: 'Perfil Padrão', mappings: {}),
+    ];
   }
 
-  List<MidiProfile> _loadFromLocalStorage() {
-    final data = html.window.localStorage[_storageKey];
-    if (data == null || data.isEmpty) {
-      return [
-        const MidiProfile(id: 'default', name: 'Perfil Padrão', mappings: {}),
-      ];
+  String loadActiveProfileIdFromCache(List<MidiProfile> availableProfiles) {
+    String? id = prefs?.getString(_userActiveKey);
+    id ??= prefs?.getString(_baseActiveKey);
+
+    if (id != null && availableProfiles.any((p) => p.id == id)) {
+      return id;
     }
+    return availableProfiles.isNotEmpty ? availableProfiles.first.id : 'default';
+  }
+
+  // ─── Salvamento local imediato + sync em background ────────────────────────
+
+  void saveProfiles(List<MidiProfile> profiles) {
+    final encoded = jsonEncode(profiles.map((e) => e.toJson()).toList());
+
+    // Write to both keys so old and new code can read it
+    prefs?.setString(_userProfilesKey, encoded);
+    prefs?.setString(_baseProfilesKey, encoded);
+
+    // Background cloud sync with timeout — safe when offline
+    if (_profilesRef != null) {
+      final map = <String, dynamic>{};
+      for (final profile in profiles) {
+        map[profile.id] = profile.toJson();
+      }
+      _profilesRef!.set(map).timeout(const Duration(seconds: 4)).catchError(
+        (e) => print('[MIDI] saveProfiles cloud timeout/offline: $e'),
+      );
+    }
+  }
+
+  void saveActiveProfileId(String id) {
+    prefs?.setString(_userActiveKey, id);
+    prefs?.setString(_baseActiveKey, id);
+
+    if (_settingsRef != null) {
+      _settingsRef!
+          .update({'activeMidiProfileId': id})
+          .timeout(const Duration(seconds: 4))
+          .catchError(
+            (e) =>
+                print('[MIDI] saveActiveProfileId cloud timeout/offline: $e'),
+          );
+    }
+  }
+
+  // ─── Cloud sync (with 3s timeout — safe on mesa de som Wi-Fi) ─────────────
+
+  Future<List<MidiProfile>?> fetchProfilesFromCloud() async {
+    if (_profilesRef == null) return null;
 
     try {
-      final List<dynamic> decoded = jsonDecode(data);
-      return decoded.map((e) => MidiProfile.fromJson(e as Map<String, dynamic>)).toList();
+      final snapshot =
+          await _profilesRef!.get().timeout(const Duration(seconds: 3));
+      if (!snapshot.exists || snapshot.value == null) return null;
+
+      final data = snapshot.value;
+      final List<MidiProfile> parsed = [];
+
+      if (data is Map) {
+        for (final entry in Map<String, dynamic>.from(data).values) {
+          try {
+            if (entry is Map) {
+              parsed.add(
+                  MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
+            }
+          } catch (e) {
+            print('[MIDI] Erro parsear perfil cloud: $e');
+          }
+        }
+      } else if (data is List) {
+        for (final entry in data) {
+          try {
+            if (entry is Map) {
+              parsed.add(
+                  MidiProfile.fromJson(Map<String, dynamic>.from(entry)));
+            }
+          } catch (e) {
+            print('[MIDI] Erro parsear perfil cloud lista: $e');
+          }
+        }
+      }
+
+      if (parsed.isNotEmpty) {
+        print('[MIDI] fetchProfilesFromCloud -> ${parsed.length} perfis da nuvem');
+        final encoded = jsonEncode(parsed.map((e) => e.toJson()).toList());
+        prefs?.setString(_userProfilesKey, encoded);
+        prefs?.setString(_baseProfilesKey, encoded);
+        return parsed;
+      }
     } catch (e) {
-      print('Erro ao carregar perfis MIDI locais: $e');
-      return [
-        const MidiProfile(id: 'default', name: 'Perfil Padrão', mappings: {}),
-      ];
+      print('[MIDI] fetchProfilesFromCloud timeout/offline (mesa de som): $e');
     }
+    return null;
   }
 
-  Future<void> saveProfiles(List<MidiProfile> profiles) async {
-    // Save to local storage as backup/offline
-    final encoded = jsonEncode(profiles.map((e) => e.toJson()).toList());
-    html.window.localStorage[_storageKey] = encoded;
+  Future<String?> fetchActiveProfileIdFromCloud() async {
+    if (_settingsRef == null) return null;
 
-    // Save to Firebase
-    if (_profilesRef != null) {
-      try {
-        final map = <String, dynamic>{};
-        for (final profile in profiles) {
-          map[profile.id] = profile.toJson();
-        }
-        await _profilesRef!.set(map);
-      } catch (e) {
-        print('Erro ao salvar perfis MIDI no Firebase: $e');
+    try {
+      final snapshot = await _settingsRef!
+          .child('activeMidiProfileId')
+          .get()
+          .timeout(const Duration(seconds: 3));
+      if (snapshot.exists && snapshot.value != null) {
+        final id = snapshot.value.toString();
+        prefs?.setString(_userActiveKey, id);
+        prefs?.setString(_baseActiveKey, id);
+        return id;
       }
+    } catch (e) {
+      print('[MIDI] fetchActiveProfileIdFromCloud timeout/offline: $e');
     }
+    return null;
+  }
+
+  // ─── Legacy helpers (backward compat) ─────────────────────────────────────
+
+  Future<List<MidiProfile>> loadProfiles() async {
+    final cached = loadProfilesFromCache();
+    final cloud = await fetchProfilesFromCloud();
+    return cloud ?? cached;
   }
 
   Future<String?> loadActiveProfileId() async {
-    if (_settingsRef != null) {
-      try {
-        final snapshot = await _settingsRef!.child('activeMidiProfileId').get();
-        if (snapshot.exists && snapshot.value != null) {
-          return snapshot.value.toString();
-        }
-      } catch (e) {
-        print('Erro ao carregar perfil ativo do Firebase: $e');
-      }
-    }
-    return html.window.localStorage[_activeProfileKey];
-  }
-
-  Future<void> saveActiveProfileId(String id) async {
-    html.window.localStorage[_activeProfileKey] = id;
-    if (_settingsRef != null) {
-      try {
-        await _settingsRef!.update({'activeMidiProfileId': id});
-      } catch (e) {
-        print('Erro ao salvar perfil ativo no Firebase: $e');
-      }
-    }
+    final cached = loadActiveProfileIdFromCache(loadProfilesFromCache());
+    final cloud = await fetchActiveProfileIdFromCloud();
+    return cloud ?? cached;
   }
 }

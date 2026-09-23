@@ -1,18 +1,19 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../../../core/theme/prefs_sync_state.dart';
+import '../../../core/theme/settings_provider.dart';
 import '../models/midi_profile.dart';
 import '../services/midi_service.dart';
 import '../services/midi_storage_service.dart';
-import '../services/midi_web_service.dart';
-
-import 'package:firebase_database/firebase_database.dart';
-import '../../../core/theme/prefs_sync_state.dart';
 
 final midiStorageServiceProvider = Provider<MidiStorageService>((ref) {
   final uid = ref.watch(currentUserIdProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
   return MidiStorageService(
     database: FirebaseDatabase.instance,
     userId: uid,
+    prefs: prefs,
   );
 });
 
@@ -53,7 +54,7 @@ class MidiState {
   });
 
   MidiProfile get activeProfile =>
-      profiles.firstWhere((p) => p.id == activeProfileId, orElse: () => profiles.first);
+      profiles.firstWhere((p) => p.id == activeProfileId, orElse: () => profiles.isNotEmpty ? profiles.first : const MidiProfile(id: 'default', name: 'Perfil Padrão'));
 
   MidiState copyWith({
     bool? isSupported,
@@ -87,8 +88,8 @@ class MidiState {
 }
 
 class MidiNotifier extends Notifier<MidiState> {
-  late final MidiService _midiService;
-  late final MidiStorageService _storage;
+  MidiService get _midiService => ref.read(midiServiceProvider);
+  MidiStorageService get _storage => ref.read(midiStorageServiceProvider);
   StreamSubscription? _midiSub;
   StreamSubscription? _stateChangeSub;
 
@@ -98,27 +99,39 @@ class MidiNotifier extends Notifier<MidiState> {
 
   @override
   MidiState build() {
-    _midiService = ref.watch(midiServiceProvider);
-    _storage = ref.watch(midiStorageServiceProvider);
+    ref.watch(midiServiceProvider);
+    final storage = ref.watch(midiStorageServiceProvider);
     
     ref.onDispose(() {
       _midiSub?.cancel();
       _stateChangeSub?.cancel();
     });
 
+    // 1. Carrega dados do cache local IMEDIATAMENTE (0ms, offline-first)
+    final cachedProfiles = storage.loadProfilesFromCache();
+    final cachedActiveId = _storage.loadActiveProfileIdFromCache(cachedProfiles);
+    final activeProfile = cachedProfiles.firstWhere(
+      (p) => p.id == cachedActiveId,
+      orElse: () => cachedProfiles.first,
+    );
+
+    // 2. Dispara inicialização do hardware Web MIDI e sincronização em segundo plano
     Future.microtask(() => _init());
-    return MidiState();
+
+    return MidiState(
+      profiles: cachedProfiles,
+      activeProfileId: cachedActiveId,
+      activeInputId: activeProfile.inputId,
+      activeOutputId: activeProfile.outputId,
+      activeChannel: activeProfile.channel,
+    );
   }
 
   Future<void> _init() async {
-    // Cancelar assinaturas anteriores antes de re-inicializar (troca de usuário)
     _midiSub?.cancel();
     _stateChangeSub?.cancel();
 
-    final profiles = await _storage.loadProfiles();
-    final activeProfileId =
-        await _storage.loadActiveProfileId() ?? (profiles.isNotEmpty ? profiles.first.id : 'default');
-
+    // 1. Inicializa o hardware Web MIDI imediatamente (totalmente local, sem depender da rede)
     final isSupported = await _midiService.initialize();
     
     if (isSupported) {
@@ -131,23 +144,70 @@ class MidiNotifier extends Notifier<MidiState> {
       _midiSub = _midiService.onMessage.listen(_onMidiMessage);
     }
 
-    state = state.copyWith(
-      isSupported: isSupported,
-      profiles: profiles,
-      activeProfileId: activeProfileId,
-    );
+    state = state.copyWith(isSupported: isSupported);
+
+    // 2. Sincronização em segundo plano com a nuvem (sem travar se estiver offline na mesa de som)
+    unawaited(_syncFromCloud());
+  }
+
+  Future<void> _syncFromCloud() async {
+    try {
+      final cloudProfiles = await _storage.fetchProfilesFromCloud();
+      final cloudActiveId = await _storage.fetchActiveProfileIdFromCloud();
+
+      if (cloudProfiles != null && cloudProfiles.isNotEmpty) {
+        final activeId = cloudActiveId ?? 
+          (cloudProfiles.any((p) => p.id == state.activeProfileId) ? state.activeProfileId : cloudProfiles.first.id);
+        
+        final activeProfile = cloudProfiles.firstWhere((p) => p.id == activeId, orElse: () => cloudProfiles.first);
+
+        state = state.copyWith(
+          profiles: cloudProfiles,
+          activeProfileId: activeId,
+          activeInputId: activeProfile.inputId ?? state.activeInputId,
+          activeOutputId: activeProfile.outputId ?? state.activeOutputId,
+          activeChannel: activeProfile.channel,
+        );
+      } else {
+        // Se a nuvem não tiver perfis gravados mas o usuário já tem perfis locais configurados,
+        // sincroniza do cache para a nuvem
+        final localProfiles = state.profiles;
+        final isModified = localProfiles.length > 1 || 
+            (localProfiles.isNotEmpty && localProfiles.first.mappings.isNotEmpty);
+        if (isModified && _storage.isSignedIn) {
+          _storage.saveProfiles(localProfiles);
+          _storage.saveActiveProfileId(state.activeProfileId);
+        }
+      }
+    } catch (e) {
+      print('[MIDI] _syncFromCloud ignorado (offline/erro): $e');
+    }
   }
 
   void _refreshInputs() {
     final inputs = _midiService.getInputs();
-    final activeId = inputs.isNotEmpty ? inputs.first.id : null;
-    state = state.copyWith(inputs: inputs, activeInputId: state.activeInputId ?? activeId);
+    final profileInput = state.activeProfile.inputId;
+    String? selectedId = state.activeInputId;
+    
+    if (profileInput != null && inputs.any((i) => i.id == profileInput)) {
+      selectedId = profileInput;
+    } else if (selectedId == null || !inputs.any((i) => i.id == selectedId)) {
+      selectedId = inputs.isNotEmpty ? inputs.first.id : null;
+    }
+    state = state.copyWith(inputs: inputs, activeInputId: selectedId);
   }
 
   void _refreshOutputs() {
     final outputs = _midiService.getOutputs();
-    final activeId = outputs.isNotEmpty ? outputs.first.id : null;
-    state = state.copyWith(outputs: outputs, activeOutputId: state.activeOutputId ?? activeId);
+    final profileOutput = state.activeProfile.outputId;
+    String? selectedId = state.activeOutputId;
+
+    if (profileOutput != null && outputs.any((o) => o.id == profileOutput)) {
+      selectedId = profileOutput;
+    } else if (selectedId == null || !outputs.any((o) => o.id == selectedId)) {
+      selectedId = outputs.isNotEmpty ? outputs.first.id : null;
+    }
+    state = state.copyWith(outputs: outputs, activeOutputId: selectedId);
   }
 
   void setActiveInput(String inputId) {
@@ -301,16 +361,7 @@ class MidiNotifier extends Notifier<MidiState> {
     if (event.isNoteOff) return;
 
     if (state.isLearning && state.learningAction != null) {
-      // Check for conflicts
       final profile = state.activeProfile;
-      String? conflictingAction;
-      profile.mappings.forEach((action, mappingList) {
-        if (mappingList.any((m) => m == cmd)) conflictingAction = action;
-      });
-
-      if (conflictingAction != null && conflictingAction != state.learningAction) {
-        // We could emit a conflict warning, but for now we just overwrite
-      }
 
       final updatedMappings = Map<String, List<MidiCommand>>.from(profile.mappings);
       final existingCommands = List<MidiCommand>.from(updatedMappings[state.learningAction!] ?? []);

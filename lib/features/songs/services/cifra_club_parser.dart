@@ -224,14 +224,17 @@ class CifraClubParser {
     chordProLines.add('{tempo: 70}'); // default tempo
     chordProLines.add('');
 
+    // Remove tab blocks from preElement before processing
+    for (final tab in preElement.querySelectorAll('.tabs, .tab')) {
+      tab.remove();
+    }
+
     // Detect which layout we're in:
     // New layout uses <div class="kvMV"> containers inside the <pre>
     final kvmvDivs = preElement.querySelectorAll('.kvMV');
 
     if (kvmvDivs.isNotEmpty) {
       // --- NEW LAYOUT PARSER ---
-      // Each <div class="kvMV"> is one "row" containing chords on the SAME line as lyrics.
-      // Structure: spaces + <b data-chord-name="X">X</b> interspersed with text nodes + newline + lyric text
       _parseNewLayout(kvmvDivs, chordProLines);
     } else {
       // --- OLD LAYOUT PARSER (fallback) ---
@@ -268,68 +271,163 @@ class CifraClubParser {
   }
 
   /// Parses the new Cifra Club layout where each `<div class="kvMV">` contains
-  /// a mix of chord `<b>` elements and plain text (lyrics) on the same line,
-  /// separated by a newline character.
+  /// a mix of chord `<b>` elements, plain text (lyrics), tabs and section markers.
   static void _parseNewLayout(List<dom.Element> kvmvDivs, List<String> chordProLines) {
+    final rawItems = <_ParsedItem>[];
+
     for (final div in kvmvDivs) {
-      // The raw inner HTML of the div contains something like:
-      //   "       <b data-chord-name="Em7" ...>Em7</b>\nNós estamos aqui\n"
-      // or just chord-only lines like:
-      //   "[Intro] <b ...>Em7</b>  <b ...>C9</b>\n"
-      final rawInner = div.innerHtml;
+      final inner = div.innerHtml;
+      final lines = inner.split('\n');
+      for (var l in lines) {
+        final trimmed = l.trim();
+        if (trimmed.isEmpty) continue;
 
-      // Split by newline to separate chord line from lyric line(s)
-      final parts = rawInner.split('\n');
-
-      // First part is always the chord/section-header line
-      final chordPart = parts.isNotEmpty ? parts[0] : '';
-      // Remaining non-empty parts are lyric lines
-      final lyricParts = parts.length > 1
-          ? parts.sublist(1).where((l) => l.trim().isNotEmpty).toList()
-          : <String>[];
-
-      final hasBoldChords = chordPart.contains('<b');
-
-      if (hasBoldChords && lyricParts.isNotEmpty) {
-        // Mixed: chord positioning + lyrics – merge them
-        final lyricLine = lyricParts.first;
-        final merged = _mergeChordsAndLyricsNew(chordPart, lyricLine);
-        chordProLines.add(merged);
-        // If there are additional lyric lines (rare), add them plain
-        for (final extra in lyricParts.sublist(1)) {
-          chordProLines.add(_stripHtmlTags(extra));
+        // Skip guitar tabs and riff tablatures
+        if (trimmed.contains('|-') || trimmed.contains('--') || 
+            RegExp(r'^[eBgDaE]\|').hasMatch(trimmed) ||
+            trimmed.toLowerCase().startsWith('tab:') ||
+            trimmed.toLowerCase().startsWith('[tab')) {
+          continue;
         }
-      } else if (hasBoldChords) {
-        // Chord-only line (e.g. [Intro] Em7  C9  G)
-        chordProLines.add(_convertChordLineToChordProNew(chordPart));
-      } else {
-        // Plain lyric / section header line
-        final text = _stripHtmlTags(chordPart);
+
+        // Check if line contains a section tag like [Intro], [Primeira Parte], etc.
+        final sectionMatch = RegExp(r'^(\[[^\]]+\])(.*)$').firstMatch(trimmed);
+        if (sectionMatch != null) {
+          final headerText = sectionMatch.group(1)!;
+          final rest = sectionMatch.group(2)!.trim();
+          rawItems.add(_ParsedItem(type: _ItemType.section, content: headerText));
+          if (rest.isNotEmpty) {
+            if (rest.contains('<b')) {
+              rawItems.add(_ParsedItem(type: _ItemType.chord, content: rest));
+            } else if (_isChordOnlyText(rest)) {
+              rawItems.add(_ParsedItem(type: _ItemType.chord, content: rest));
+            } else {
+              rawItems.add(_ParsedItem(type: _ItemType.lyric, content: rest));
+            }
+          }
+          continue;
+        }
+
+        // Check if line is purely a section tag
+        if (RegExp(r'^\[[^\]]+\]$').hasMatch(trimmed)) {
+          rawItems.add(_ParsedItem(type: _ItemType.section, content: trimmed));
+          continue;
+        }
+
+        // Check if line contains <b> chords
+        if (l.contains('<b')) {
+          rawItems.add(_ParsedItem(type: _ItemType.chord, content: l));
+        } else {
+          // Plain text without <b>
+          final plain = _stripHtmlTags(l);
+          if (plain.trim().isNotEmpty) {
+            rawItems.add(_ParsedItem(type: _ItemType.lyric, content: plain));
+          }
+        }
+      }
+    }
+
+    bool seenFirstVerse = false;
+    bool seenChorus = false;
+
+    int i = 0;
+    while (i < rawItems.length) {
+      final item = rawItems[i];
+
+      if (item.type == _ItemType.section) {
+        String secTitle = item.content.trim();
+        // Normalize section titles
+        if (secTitle.toLowerCase() == '[intro]') {
+          secTitle = '[Introdução]';
+        }
+
+        // Verse renaming: if Primeira Parte repeats after chorus, name it Segunda Parte
+        if (secTitle.toLowerCase() == '[primeira parte]') {
+          if (seenFirstVerse && seenChorus) {
+            secTitle = '[Segunda Parte]';
+          } else {
+            seenFirstVerse = true;
+          }
+        } else if (secTitle.toLowerCase().contains('refrão') || secTitle.toLowerCase().contains('refrao')) {
+          seenChorus = true;
+        }
+
+        // Avoid consecutive duplicate section titles
+        if (chordProLines.isNotEmpty) {
+          final lastNonEmpty = chordProLines.lastWhere((l) => l.trim().isNotEmpty, orElse: () => '');
+          if (lastNonEmpty.toLowerCase() == secTitle.toLowerCase()) {
+            i++;
+            continue;
+          }
+        }
+
+        // Ensure blank line before section header (unless at top)
+        if (chordProLines.isNotEmpty && chordProLines.last.isNotEmpty) {
+          chordProLines.add('');
+        }
+        chordProLines.add(secTitle);
+        i++;
+        continue;
+      }
+
+      if (item.type == _ItemType.chord) {
+        // Lookahead: is the next item a real lyric line?
+        // Note: A section header is NOT a lyric line!
+        if (i + 1 < rawItems.length && rawItems[i + 1].type == _ItemType.lyric) {
+          final chordHtml = item.content;
+          final lyricText = rawItems[i + 1].content;
+          final merged = _mergeChordsAndLyricsNew(chordHtml, lyricText);
+          chordProLines.add(merged);
+          i += 2; // consumed both
+        } else {
+          // Standalone chord line (Intro, instrumental, passage, etc.)
+          final chordProLine = _convertChordLineToChordProNew(item.content);
+          if (chordProLine.trim().isNotEmpty) {
+            // Avoid duplicate consecutive identical intro chord lines
+            if (chordProLines.isNotEmpty && chordProLines.last.trim() == chordProLine.trim()) {
+              i++;
+              continue;
+            }
+            chordProLines.add(chordProLine);
+          }
+          i++;
+        }
+        continue;
+      }
+
+      if (item.type == _ItemType.lyric) {
+        final text = item.content.trim();
         if (text.isNotEmpty) {
           chordProLines.add(text);
         }
-        for (final lyric in lyricParts) {
-          final lt = _stripHtmlTags(lyric);
-          if (lt.isNotEmpty) chordProLines.add(lt);
-        }
+        i++;
+        continue;
       }
     }
   }
 
+  static bool _isChordOnlyText(String text) {
+    final clean = text.replaceAll(RegExp(r'[\s\(\)\|\/\d]'), '');
+    return clean.isNotEmpty && RegExp(r'^[A-G#bmsuadd]+$').hasMatch(clean);
+  }
+
   /// Converts a chord-only HTML line in the NEW format (with data-chord-name attributes)
-  /// to ChordPro inline chord notation.
+  /// to ChordPro inline chord notation with clean double spacing.
   static String _convertChordLineToChordProNew(String chordLineHtml) {
-    // <b data-chord-name="Em7" ...>Em7</b> → [Em7]
-    // Use data-chord-name attribute which is more reliable
-    String result = chordLineHtml.replaceAllMapped(
-      RegExp(r'<b\s[^>]*data-chord-name="([^"]+)"[^>]*>.*?</b>', dotAll: true),
-      (m) => '[${m.group(1)}]',
-    );
-    // Fallback: plain <b>X</b>
-    result = result.replaceAllMapped(RegExp(r'<b>(.*?)</b>'), (m) => '[${m.group(1)}]');
-    // Strip any remaining HTML tags
-    result = result.replaceAll(RegExp(r'<[^>]*>'), '');
-    return result;
+    final chords = <String>[];
+    final regex = RegExp(r'<b\s[^>]*data-chord-name="([^"]+)"[^>]*>.*?</b>|<b[^>]*>(.*?)</b>');
+    for (final m in regex.allMatches(chordLineHtml)) {
+      final chord = m.group(1) ?? m.group(2);
+      if (chord != null && chord.isNotEmpty) {
+        chords.add('[$chord]');
+      }
+    }
+
+    if (chords.isEmpty) {
+      return _stripHtmlTags(chordLineHtml).trim();
+    }
+
+    return chords.join('  ');
   }
 
   /// Merges chord HTML line with a lyric line in the NEW layout.
@@ -337,23 +435,22 @@ class CifraClubParser {
     final List<Map<String, dynamic>> chords = [];
     int visualPosition = 0;
 
-    // Match <b data-chord-name="X" ...> or plain text/spaces
-    final regex = RegExp(r'(<b\s[^>]*data-chord-name="([^"]+)"[^>]*>.*?</b>)|([^<]+)', dotAll: true);
+    final regex = RegExp(r'(<b\s[^>]*data-chord-name="([^"]+)"[^>]*>.*?</b>)|(<b[^>]*>(.*?)</b>)|([^<]+)', dotAll: true);
     for (final match in regex.allMatches(chordLineHtml)) {
       if (match.group(1) != null) {
-        // It's a chord element – use data-chord-name attribute
         final chordName = match.group(2)!;
         chords.add({'chord': chordName, 'pos': visualPosition});
         visualPosition += chordName.length;
       } else if (match.group(3) != null) {
-        // Plain text (spaces between chords)
-        visualPosition += match.group(3)!.length;
+        final chordName = match.group(4)!;
+        chords.add({'chord': chordName, 'pos': visualPosition});
+        visualPosition += chordName.length;
+      } else if (match.group(5) != null) {
+        visualPosition += match.group(5)!.length;
       }
     }
 
-    // Strip HTML tags from lyric line
     String result = _stripHtmlTags(lyricLine);
-    // Pad if lyric is shorter than the last chord position
     if (chords.isNotEmpty) {
       final maxPos = chords.last['pos'] as int;
       if (result.length < maxPos) {
@@ -361,14 +458,13 @@ class CifraClubParser {
       }
     }
 
-    // Insert chords from back to front to avoid index shifting
     for (var i = chords.length - 1; i >= 0; i--) {
       final chord = chords[i]['chord'] as String;
       final pos = chords[i]['pos'] as int;
       if (pos < result.length) {
         result = '${result.substring(0, pos)}[$chord]${result.substring(pos)}';
       } else {
-        result += '[$chord]';
+        result += '  [$chord]';
       }
     }
 
@@ -427,3 +523,13 @@ class CifraClubParser {
     return result;
   }
 }
+
+enum _ItemType { section, chord, lyric }
+
+class _ParsedItem {
+  final _ItemType type;
+  final String content;
+
+  _ParsedItem({required this.type, required this.content});
+}
+

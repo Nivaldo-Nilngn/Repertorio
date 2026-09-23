@@ -11,6 +11,7 @@ import 'core/theme/user_settings_sync.dart';
 import 'features/manager/screens/manager_screen.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/midi/providers/midi_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -104,6 +105,8 @@ class KordApp extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     // Mantém o coordinator vivo: ele puxa/planta as prefs do RTDB no login
     ref.watch(userSettingsSyncCoordinatorProvider);
+    // Precarrega e ativa o serviço MIDI em cache instantaneamente (offline-first)
+    ref.watch(midiProvider);
 
     return MaterialApp(
       title: 'KordApp',

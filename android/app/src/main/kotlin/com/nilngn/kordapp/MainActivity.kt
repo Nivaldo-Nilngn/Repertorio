@@ -1,4 +1,4 @@
-package com.example.musicifras
+package com.nilngn.kordapp
 
 import io.flutter.embedding.android.FlutterActivity
 

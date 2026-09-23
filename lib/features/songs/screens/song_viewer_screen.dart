@@ -1,11 +1,11 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/song.dart';
 import '../models/song_setlist.dart';
 
@@ -21,6 +21,8 @@ import '../../midi/providers/midi_providers.dart';
 import '../../../core/theme/settings_provider.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../widgets/youtube_iframe_stub.dart'
+    if (dart.library.html) '../widgets/youtube_iframe_web.dart' as youtube;
 
 enum VideoDisplayState { full, mini, hidden }
 enum SongViewMode { lyrics, roadmap, harmonic }
@@ -223,42 +225,17 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
     WakelockPlus.enable();
   }
 
-  html.IFrameElement? _youtubeIframe;
-
+  // YouTube iframe — web only, handled via conditional import
   // Track registered view factories across hot restarts
   static final Set<String> _registeredViewIds = {};
 
   void _registerVideoIframe() {
-    if (_parsedSong.video.isNotEmpty) {
-      final String viewId = 'youtube-iframe-${_parsedSong.video}';
-      final videoId = _extractYoutubeId(_parsedSong.video);
-
-      // Create the iframe element regardless (we always want a fresh reference)
-      _youtubeIframe = html.IFrameElement()
-        ..width = '100%'
-        ..height = '100%'
-        ..src = 'https://www.youtube.com/embed/$videoId?enablejsapi=1&autoplay=0'
-        ..style.border = 'none'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-        ..allowFullscreen = true;
-
-      // Only register the factory once per session (hot restart safe)
-      if (!_registeredViewIds.contains(viewId)) {
-        _registeredViewIds.add(viewId);
-        try {
-          // ignore: undefined_prefixed_name
-          ui_web.platformViewRegistry.registerViewFactory(
-            viewId,
-            (int id) => _youtubeIframe!,
-          );
-        } catch (_) {
-          // Already registered — safe to ignore
-        }
-      }
-    }
+    if (_parsedSong.video.isEmpty) return;
+    final videoId = _extractYoutubeId(_parsedSong.video);
+    // On mobile this is a no-op (stub). On web it registers the IFrameElement.
+    youtube.registerYoutubeIframe(_parsedSong.video, videoId);
   }
+
 
   @override
   void dispose() {
@@ -569,6 +546,7 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(midiProvider);
     ref.listen<String?>(midiActionStreamProvider, (previous, next) {
       if (next != null) {
         _handleMidiAction(next);
@@ -1854,9 +1832,46 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
   }
 
   Widget _buildVideoPlaceholder() {
+    if (!kIsWeb) {
+      // Mobile: open in YouTube app / browser
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: Colors.black,
+              border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: InkWell(
+                onTap: () async {
+                  final uri = Uri.tryParse(_parsedSong.video);
+                  if (uri != null && await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.play_circle_filled, color: Colors.white, size: 56),
+                    SizedBox(height: 8),
+                    Text('Abrir no YouTube',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 340), // Limita o tamanho máximo na tela
+        constraints: const BoxConstraints(maxWidth: 340),
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
@@ -1864,14 +1879,12 @@ class _SongViewerScreenState extends ConsumerState<SongViewerScreen> {
             border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
           ),
           clipBehavior: Clip.hardEdge,
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: HtmlElementView(viewType: 'youtube-iframe-${_parsedSong.video}'),
-          ),
+          child: youtube.buildYoutubeView(_parsedSong.video),
         ),
       ),
     );
   }
+
 
   String _extractYoutubeId(String url) {
     final uri = Uri.tryParse(url);
@@ -3268,7 +3281,8 @@ class _MiniAudioPlayer extends StatefulWidget {
   final String title;
   final String artist;
   final String videoId;
-  final html.IFrameElement? iframeElement;
+  // On web: dart:html IFrameElement. On mobile: null (not used).
+  final Object? iframeElement;
   final VoidCallback onExpand;
 
   const _MiniAudioPlayer({
@@ -3297,11 +3311,16 @@ class _MiniAudioPlayerState extends State<_MiniAudioPlayer> {
   }
 
   void _sendCommand(String func, [String args = '']) {
-    final argsJson = args.isEmpty ? '[]' : '[$args]';
-    widget.iframeElement?.contentWindow?.postMessage(
-      '{"event":"command","func":"$func","args":$argsJson}',
-      '*',
-    );
+    // postMessage is web-only; on mobile iframeElement is null → no-op.
+    if (!kIsWeb || widget.iframeElement == null) return;
+    // ignore: avoid_web_libraries_in_flutter
+    // The cast is safe because on web the field is always an IFrameElement.
+    try {
+      (widget.iframeElement as dynamic).contentWindow?.postMessage(
+        '{"event":"command","func":"$func","args":${args.isEmpty ? '[]' : '[$args]'}}',
+        '*',
+      );
+    } catch (_) {}
   }
 
   void _togglePlayPause() {

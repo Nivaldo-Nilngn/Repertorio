@@ -860,15 +860,12 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
                           try {
                             final chordPro =
                                 await CifraClubParser.fetchAndParse(url);
-                            final parsed = ChordProParser.parse(chordPro);
-                            final roadmapText =
-                                SongRoadmapBuilder.convertToRoadmapText(parsed);
 
                             ref
                                 .read(selectedSongIdProvider.notifier)
                                 .select(null);
                             ref.read(editingChordProProvider.notifier).state =
-                                roadmapText;
+                                chordPro;
                             ref.read(isEditorVisibleProvider.notifier).state =
                                 true;
 
@@ -2076,7 +2073,7 @@ E os acordes [G]entre colchetes
                         _buildToolbarButton('Introdução', '[Introdução]\n'),
                         const SizedBox(width: 6),
                         _buildToolbarButton(
-                          'Primeira Parte',
+                          'Parte',
                           '[Primeira Parte]\n',
                         ),
                         const SizedBox(width: 6),
@@ -2084,14 +2081,11 @@ E os acordes [G]entre colchetes
                         const SizedBox(width: 6),
                         _buildToolbarButton('Refrão', '[Refrão]\n'),
                         const SizedBox(width: 6),
-                        _buildToolbarButton(
-                          'Segunda Parte',
-                          '[Segunda Parte]\n',
-                        ),
-                        const SizedBox(width: 6),
                         _buildToolbarButton('Ponte', '[Ponte]\n'),
                         const SizedBox(width: 6),
-                        _buildToolbarButton('OBS', 'OBS: '),
+                        _buildToolbarButton('Solo', '[Solo]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Final', '[Final]\n'),
 
                       ],
                     ),
@@ -2600,47 +2594,55 @@ E os acordes [G]entre colchetes
                       vertical: 8,
                     ),
                     color: colors.surfaceContainer,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back, size: 20),
-                              tooltip: 'Voltar para a Lista',
-                              onPressed: () {
-                                ref
-                                        .read(isEditorVisibleProvider.notifier)
-                                        .state =
-                                    false;
-                              },
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'EDITOR DE MÚSICA',
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => _showImportDialog(context),
-                              icon: const Icon(Icons.auto_awesome, size: 16),
-                              label: const Text('IMPORTAR CIFRA'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.amberAccent,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.arrow_back, size: 20),
+                                    tooltip: 'Voltar para a Lista',
+                                    onPressed: () {
+                                      ref
+                                              .read(isEditorVisibleProvider.notifier)
+                                              .state =
+                                          false;
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'EDITOR DE MÚSICA',
+                                    style: Theme.of(context).textTheme.labelSmall,
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton.icon(
-                              onPressed: _saveToFirebase,
-                              icon: const Icon(Icons.cloud_upload, size: 16),
-                              label: const Text('SALVAR MÚSICA'),
-                            ),
-                          ],
+                              Row(
+                                children: [
+                                  TextButton.icon(
+                                    onPressed: () => _showImportDialog(context),
+                                    icon: const Icon(Icons.auto_awesome, size: 16),
+                                    label: const Text('IMPORTAR CIFRA'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.amberAccent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextButton.icon(
+                                    onPressed: _saveToFirebase,
+                                    icon: const Icon(Icons.cloud_upload, size: 16),
+                                    label: const Text('SALVAR MÚSICA'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                   Expanded(
@@ -2698,12 +2700,11 @@ E os acordes [G]entre colchetes
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          // Row 2: Video URL, Collection dropdown, and Original Key dropdown
+                          const SizedBox(height: 14),
+                          // Row 2: Video URL & Collection dropdown
                           Row(
                             children: [
                               Expanded(
-                                flex: 2,
                                 child: TextField(
                                   controller: _videoUrlController,
                                   style: TextStyle(
@@ -2724,9 +2725,8 @@ E os acordes [G]entre colchetes
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 14),
                               Expanded(
-                                flex: 2,
                                 child: InputDecorator(
                                   decoration: const InputDecoration(
                                     labelText: 'Repertório / Coleção',
@@ -2791,9 +2791,17 @@ E os acordes [G]entre colchetes
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                flex: 1,
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          // Row 3: Key dropdown & Simplify button (Wrap prevents overflow)
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 160,
                                 child: InputDecorator(
                                   decoration: const InputDecoration(
                                     labelText: 'Tom Original',
@@ -2883,25 +2891,9 @@ E os acordes [G]entre colchetes
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
-                              SizedBox(
-                                height: 56,
-                                child: FilledButton.icon(
-                                  onPressed: _simplifyChords,
-                                icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
-                                label: const Text('Simplificar'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
-                                  foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  elevation: 0,
-                                ),
-                                ),
-                              ),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           // Toolbar
                           Row(
                             children: [
@@ -2916,7 +2908,7 @@ E os acordes [G]entre colchetes
                                       ),
                                       const SizedBox(width: 8),
                                       _buildToolbarButton(
-                                        'Primeira Parte',
+                                        'Parte',
                                         '[Primeira Parte]\n',
                                       ),
                                       const SizedBox(width: 8),
@@ -2930,15 +2922,11 @@ E os acordes [G]entre colchetes
                                         '[Refrão]\n',
                                       ),
                                       const SizedBox(width: 8),
-                                      _buildToolbarButton(
-                                        'Segunda Parte',
-                                        '[Segunda Parte]\n',
-                                      ),
-                                      const SizedBox(width: 8),
                                       _buildToolbarButton('Ponte', '[Ponte]\n'),
                                       const SizedBox(width: 8),
-                                      _buildToolbarButton('OBS', 'OBS: '),
-
+                                      _buildToolbarButton('Solo', '[Solo]\n'),
+                                      const SizedBox(width: 8),
+                                      _buildToolbarButton('Final', '[Final]\n'),
                                     ],
                                   ),
                                 ),

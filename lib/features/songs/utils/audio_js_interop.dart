@@ -1,7 +1,8 @@
+// ignore_for_file: avoid_web_libraries_in_flutter
 @JS()
 library audio_interop;
 
-import 'package:js/js.dart';
+import 'dart:js_interop';
 
 @JS('AdvancedAudioPlayerJS.init')
 external void initAudioPlayer(String url, void Function() onLoad);

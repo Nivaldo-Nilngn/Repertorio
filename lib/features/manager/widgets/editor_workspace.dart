@@ -173,6 +173,21 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
     }
   }
 
+  void _setFormat(ChordFormat newFormat) {
+    if (_format == newFormat) return;
+    setState(() {
+      _isProcessingInternalChange = true;
+      if (newFormat == ChordFormat.text) {
+        _contentController.text = ChordConverter.chordProToText(_contentController.text);
+      } else {
+        _contentController.text = ChordConverter.textToChordPro(_contentController.text);
+      }
+      _format = newFormat;
+      _isProcessingInternalChange = false;
+    });
+    _onFieldChanged();
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -343,6 +358,273 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
     );
   }
 
+  static const _partNames = [
+    'Primeira Parte',
+    'Segunda Parte',
+    'Terceira Parte',
+    'Quarta Parte',
+    'Quinta Parte',
+    'Sexta Parte',
+    'Sétima Parte',
+    'Oitava Parte',
+    'Nona Parte',
+    'Décima Parte',
+  ];
+
+  Widget _buildPartDropdownButton(ColorScheme colors) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        popupMenuTheme: PopupMenuThemeData(
+          color: colors.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+      child: PopupMenuButton<String>(
+        tooltip: 'Inserir Parte (Verso)',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: colors.surfaceContainerHigh,
+        onSelected: (parte) {
+          if (parte == '__custom__') {
+            _showCustomPartDialog(context);
+          } else {
+            _insertText('[$parte]\n');
+          }
+        },
+        itemBuilder: (context) => [
+          ..._partNames.map((p) => PopupMenuItem(
+                value: p,
+                height: 36,
+                child: Text(p, style: TextStyle(color: colors.onSurface, fontSize: 13)),
+              )),
+          const PopupMenuDivider(),
+          PopupMenuItem(
+            value: '__custom__',
+            height: 36,
+            child: Row(
+              children: [
+                Icon(Icons.edit, size: 16, color: colors.primary),
+                const SizedBox(width: 8),
+                Text('Outra Parte...', style: TextStyle(color: colors.primary, fontSize: 13, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Text(
+                'Parte (Verso)',
+                style: TextStyle(
+                  color: Color(0xFF34D399),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down, size: 16, color: Color(0xFF34D399)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCustomPartDialog(BuildContext context) {
+    final controller = TextEditingController();
+    final colors = Theme.of(context).colorScheme;
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: colors.surfaceContainerHigh,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text('Nome da Parte', style: TextStyle(color: colors.onSurface, fontWeight: FontWeight.bold)),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Ex: 11ª Parte, Parte Especial, Estrofe...',
+              labelText: 'Nome da Seção',
+              filled: true,
+              fillColor: colors.surfaceContainerHighest,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+            onSubmitted: (val) {
+              if (val.trim().isNotEmpty) {
+                Navigator.pop(context);
+                _insertText('[${val.trim()}]\n');
+              }
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final val = controller.text.trim();
+                if (val.isNotEmpty) {
+                  Navigator.pop(context);
+                  _insertText('[$val]\n');
+                }
+              },
+              child: const Text('Inserir'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddMedleyDialog(BuildContext context) {
+    final songs = ref.read(songListProvider).value ?? [];
+    if (songs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nenhuma música salva encontrada para o Medley.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filtered = songs.where((s) {
+              final q = searchQuery.toLowerCase();
+              return s.title.toLowerCase().contains(q) || s.artist.toLowerCase().contains(q);
+            }).toList();
+
+            final colors = Theme.of(context).colorScheme;
+
+            return AlertDialog(
+              backgroundColor: colors.surfaceContainerHigh,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Row(
+                children: [
+                  Icon(Icons.library_music, color: colors.primary),
+                  const SizedBox(width: 8),
+                  const Text('Juntar Música (Medley)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: SizedBox(
+                width: 480,
+                height: 420,
+                child: Column(
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        hintText: 'Buscar por título ou artista...',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        filled: true,
+                        fillColor: colors.surfaceContainerHighest,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                      onChanged: (val) => setDialogState(() => searchQuery = val),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Nenhuma música encontrada',
+                                style: TextStyle(color: colors.onSurfaceVariant),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: colors.outline.withValues(alpha: 0.1)),
+                              itemBuilder: (context, i) {
+                                final s = filtered[i];
+                                return ListTile(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  title: Text(s.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  subtitle: Text('${s.artist} • Tom: ${s.key}', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12)),
+                                  trailing: Icon(Icons.add_circle_outline, color: colors.primary),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _mergeSongIntoMedley(s);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _mergeSongIntoMedley(Song songToMerge) {
+    // 1. Combine title
+    final currentTitle = _titleController.text.trim();
+    if (currentTitle.isEmpty || currentTitle == 'Nova Música') {
+      _titleController.text = songToMerge.title;
+    } else if (!currentTitle.toLowerCase().contains(songToMerge.title.toLowerCase())) {
+      _titleController.text = '$currentTitle / ${songToMerge.title}';
+    }
+
+    // 2. Combine artist
+    final currentArtist = _artistController.text.trim();
+    if (currentArtist.isEmpty || currentArtist == 'Artista Desconhecido') {
+      _artistController.text = songToMerge.artist;
+    } else if (!currentArtist.toLowerCase().contains(songToMerge.artist.toLowerCase()) && songToMerge.artist != 'Artista Desconhecido') {
+      _artistController.text = '$currentArtist / ${songToMerge.artist}';
+    }
+
+    // 3. Extract content of songToMerge
+    String content = songToMerge.content
+        .replaceAll(RegExp(r'^\{title:.*?\}\n?', multiLine: true), '')
+        .replaceAll(RegExp(r'^\{artist:.*?\}\n?', multiLine: true), '')
+        .replaceAll(RegExp(r'^\{key:.*?\}\n?', multiLine: true), '')
+        .replaceAll(RegExp(r'^\{video:.*?\}\n?', multiLine: true), '')
+        .replaceAll(RegExp(r'^\{tempo:.*?\}\n?', multiLine: true), '')
+        .trim();
+
+    // 4. Format according to current active format
+    if (_format == ChordFormat.text) {
+      content = ChordConverter.chordProToText(content);
+    }
+
+    final header = '[Medley: ${songToMerge.title}]\n';
+    final existingText = _contentController.text.trimRight();
+    if (existingText.isEmpty) {
+      _contentController.text = '$header$content\n';
+    } else {
+      _contentController.text = '$existingText\n\n$header$content\n';
+    }
+
+    _onFieldChanged();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Música "${songToMerge.title}" adicionada ao Medley!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   void _showLocalImportDialog(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final urlController = TextEditingController();
@@ -396,11 +678,9 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
 
                           try {
                             final chordPro = await CifraClubParser.fetchAndParse(url);
-                            final parsed = ChordProParser.parse(chordPro);
-                            final roadmapText = SongRoadmapBuilder.convertToRoadmapText(parsed);
                             
                             ref.read(selectedSongIdProvider.notifier).select(null);
-                            ref.read(editingChordProProvider.notifier).state = roadmapText;
+                            ref.read(editingChordProProvider.notifier).state = chordPro;
                             ref.read(isEditorVisibleProvider.notifier).state = true;
                             
                             if (context.mounted) {
@@ -1094,14 +1374,14 @@ E os acordes [G]entre colchetes
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
-                  message: 'Simplificar Acordes',
+                  message: 'Juntar Música (Medley)',
                   child: IconButton.filledTonal(
-                    onPressed: _simplifyChords,
-                    icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
-                      style: IconButton.styleFrom(
-                        backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
-                        foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                      ),
+                    onPressed: () => _showAddMedleyDialog(context),
+                    icon: const Icon(Icons.library_music, size: 20),
+                    style: IconButton.styleFrom(
+                      backgroundColor: colors.surfaceContainerHighest,
+                      foregroundColor: colors.primary,
+                    ),
                   ),
                 ),
               ],
@@ -1114,18 +1394,17 @@ E os acordes [G]entre colchetes
                       children: [
                         _buildToolbarButton('Introdução', '[Introdução]\n'),
                         const SizedBox(width: 6),
-                        _buildToolbarButton('Primeira Parte', '[Primeira Parte]\n'),
+                        _buildPartDropdownButton(colors),
                         const SizedBox(width: 6),
                         _buildToolbarButton('Pré-refrão', '[Pré-refrão]\n'),
                         const SizedBox(width: 6),
                         _buildToolbarButton('Refrão', '[Refrão]\n'),
                         const SizedBox(width: 6),
-                        _buildToolbarButton('Segunda Parte', '[Segunda Parte]\n'),
-                        const SizedBox(width: 6),
                         _buildToolbarButton('Ponte', '[Ponte]\n'),
                         const SizedBox(width: 6),
-                        _buildToolbarButton('OBS', 'OBS: '),
-
+                        _buildToolbarButton('Solo', '[Solo]\n'),
+                        const SizedBox(width: 6),
+                        _buildToolbarButton('Final', '[Final]\n'),
                       ],
                     ),
                   ),
@@ -1470,11 +1749,10 @@ E os acordes [G]entre colchetes
                           ],
                         ),
                         const SizedBox(height: 16),
-                        // Row 2: Video URL, Collection dropdown, and Original Key dropdown
+                        // Row 2: Video URL & Collection dropdown
                         Row(
                           children: [
                             Expanded(
-                              flex: 2,
                               child: TextField(
                                 controller: _videoUrlController,
                                 style: TextStyle(fontSize: 14, color: colors.onSurface),
@@ -1488,9 +1766,8 @@ E os acordes [G]entre colchetes
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 14),
                             Expanded(
-                              flex: 2,
                               child: InputDecorator(
                                 decoration: InputDecoration(
                                   labelText: 'Repertório / Coleção',
@@ -1527,9 +1804,17 @@ E os acordes [G]entre colchetes
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              flex: 1,
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        // Row 3: Key dropdown, Simplify button & Chord Format toggle (Wrap prevents overflow)
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 160,
                               child: InputDecorator(
                                 decoration: InputDecoration(
                                   labelText: 'Tom Original',
@@ -1537,20 +1822,20 @@ E os acordes [G]entre colchetes
                                   filled: true,
                                   fillColor: colors.surfaceContainerHighest,
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
                                     value: _selectedKey,
                                     isExpanded: true,
                                     dropdownColor: colors.surfaceContainerHigh,
-                                    style: TextStyle(color: colors.onSurface, fontSize: 14),
+                                    style: TextStyle(color: colors.onSurface, fontSize: 13),
                                     selectedItemBuilder: (context) {
                                       return ['Detectar', ..._majorKeys].map((k) {
                                         if (k == 'Detectar') {
                                           return Align(
                                             alignment: Alignment.centerLeft,
-                                            child: Text('Detectar', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 14)),
+                                            child: Text('Detectar', style: TextStyle(color: colors.onSurfaceVariant, fontSize: 13)),
                                           );
                                         }
                                         final idx = _majorKeys.indexOf(k);
@@ -1558,7 +1843,7 @@ E os acordes [G]entre colchetes
                                           alignment: Alignment.centerLeft,
                                           child: Text(
                                             '$k / ${_minorKeys[idx]}',
-                                            style: TextStyle(color: colors.onSurface, fontSize: 14),
+                                            style: TextStyle(color: colors.onSurface, fontSize: 13),
                                           ),
                                         );
                                       }).toList();
@@ -1579,7 +1864,7 @@ E os acordes [G]entre colchetes
                                     onChanged: (v) {
                                       if (v != null) {
                                         _transposeEditorContent(fromKey: _selectedKey, toKey: v);
-setState(() => _selectedKey = v);
+                                        setState(() => _selectedKey = v);
                                         _onFieldChanged();
                                       }
                                     },
@@ -1587,25 +1872,43 @@ setState(() => _selectedKey = v);
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            SizedBox(
-                              height: 56,
-                              child: FilledButton.icon(
-                                onPressed: _simplifyChords,
-                                icon: Icon(_isSimplified ? Icons.auto_fix_off : Icons.auto_fix_high, size: 20),
-                                label: const Text('Simplificar'),
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _isSimplified ? colors.primaryContainer : colors.surfaceContainerHighest,
-                                  foregroundColor: _isSimplified ? colors.onPrimaryContainer : colors.onSurfaceVariant,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                                  elevation: 0,
+                            FilledButton.tonalIcon(
+                              onPressed: () => _showAddMedleyDialog(context),
+                              icon: const Icon(Icons.library_music, size: 18),
+                              label: const Text('+ Medley / Juntar Música'),
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                              ),
+                            ),
+                            SegmentedButton<ChordFormat>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: ChordFormat.chordPro,
+                                  label: Text('ChordPro'),
+                                  tooltip: 'Acordes embutidos: [C]Letra',
+                                  icon: Icon(Icons.code, size: 16),
+                                ),
+                                ButtonSegment(
+                                  value: ChordFormat.text,
+                                  label: Text('Cifra Simples'),
+                                  tooltip: 'Acordes acima da letra (estilo tradicional)',
+                                  icon: Icon(Icons.text_snippet, size: 16),
+                                ),
+                              ],
+                              selected: {_format},
+                              onSelectionChanged: (set) => _setFormat(set.first),
+                              showSelectedIcon: false,
+                              style: ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                shape: WidgetStatePropertyAll(
+                                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
                         // Toolbar
                         Row(
                           children: [
@@ -1616,18 +1919,17 @@ setState(() => _selectedKey = v);
                                   children: [
                                     _buildToolbarButton('Introdução', '[Introdução]\n'),
                                     const SizedBox(width: 8),
-                                    _buildToolbarButton('Primeira Parte', '[Primeira Parte]\n'),
+                                    _buildPartDropdownButton(colors),
                                     const SizedBox(width: 8),
                                     _buildToolbarButton('Pré-refrão', '[Pré-refrão]\n'),
                                     const SizedBox(width: 8),
                                     _buildToolbarButton('Refrão', '[Refrão]\n'),
                                     const SizedBox(width: 8),
-                                    _buildToolbarButton('Segunda Parte', '[Segunda Parte]\n'),
-                                    const SizedBox(width: 8),
                                     _buildToolbarButton('Ponte', '[Ponte]\n'),
                                     const SizedBox(width: 8),
-                                    _buildToolbarButton('OBS', 'OBS: '),
-
+                                    _buildToolbarButton('Solo', '[Solo]\n'),
+                                    const SizedBox(width: 8),
+                                    _buildToolbarButton('Final', '[Final]\n'),
                                   ],
                                 ),
                               ),

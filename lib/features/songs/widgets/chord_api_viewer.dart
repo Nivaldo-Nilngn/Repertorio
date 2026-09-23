@@ -1,89 +1,62 @@
-import 'dart:html' as html;
-import 'dart:ui_web' as ui_web;
+// ignore_for_file: avoid_web_libraries_in_flutter
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+// Web-only imports guarded by conditional — only referenced inside kIsWeb blocks
+// so they compile fine on mobile (tree-shaken away by the Dart compiler).
+import 'chord_api_viewer_web.dart' if (dart.library.io) 'chord_api_viewer_stub.dart'
+    as platform;
+
+/// Shows a chord diagram fetched from scales-chords.com.
+///
+/// On web: renders via an iframe (scales-chords API).
+/// On mobile: shows a text label with the chord name (NativeChordDiagram
+/// handles the visual diagram rendering via flutter_guitar_chord).
 class ChordApiViewer extends StatefulWidget {
   final String chord;
   final String instrument; // 'guitar' or 'piano'
 
-  const ChordApiViewer({Key? key, required this.chord, required this.instrument}) : super(key: key);
+  const ChordApiViewer(
+      {Key? key, required this.chord, required this.instrument})
+      : super(key: key);
 
   @override
   State<ChordApiViewer> createState() => _ChordApiViewerState();
 }
 
 class _ChordApiViewerState extends State<ChordApiViewer> {
-  late String _viewType;
-
   @override
   void initState() {
     super.initState();
-    _viewType = 'chord-api-${widget.chord}-${widget.instrument}-${DateTime.now().millisecondsSinceEpoch}';
-    
-    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
-      return html.IFrameElement()
-        ..width = '100%'
-        ..height = '100%'
-        ..style.border = 'none'
-        ..style.setProperty('pointer-events', 'none')
-        ..srcdoc = '''
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              html, body {
-                margin: 0; padding: 0; height: 100%; width: 100%;
-                display: flex; justify-content: center; align-items: center;
-                background-color: transparent;
-                overflow: hidden;
-              }
-              ins {
-                width: 100%;
-                height: 100%;
-                display: flex !important;
-                justify-content: center;
-                align-items: center;
-              }
-              img {
-                width: 100%;
-                height: 100%;
-              }
-              /* Specific adjustments for Piano */
-              .instrument-piano img {
-                object-fit: cover;
-                object-position: bottom center;
-              }
-              /* Specific adjustments for Guitar */
-              .instrument-guitar img {
-                object-fit: contain;
-              }
-            </style>
-            <script async type="text/javascript" src="https://www.scales-chords.com/api/scales-chords-api.js"></script>
-          </head>
-          <body class="instrument-${widget.instrument}">
-            <ins class="scales_chords_api" chord="${widget.chord}" instrument="${widget.instrument}"></ins>
-          </body>
-          </html>
-        ''';
-    });
+    if (kIsWeb) {
+      platform.registerChordViewFactory(widget.chord, widget.instrument);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: widget.instrument == 'guitar' ? 140 : 80,
-      width: double.infinity,
-      color: Colors.white,
-      child: Stack(
-        children: [
-          HtmlElementView(viewType: _viewType),
-          Positioned.fill(
-            child: Container(
-              color: Colors.transparent,
-            ),
+    if (!kIsWeb) {
+      // Mobile: just show the chord name — NativeChordDiagram handles visuals
+      return Container(
+        height: widget.instrument == 'guitar' ? 140 : 80,
+        width: double.infinity,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          widget.chord,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    }
+
+    return platform.buildChordView(context, widget.chord, widget.instrument);
   }
 }
