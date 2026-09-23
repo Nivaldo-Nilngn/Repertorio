@@ -1,8 +1,10 @@
+import 'dart:ui';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:ui';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -17,12 +19,57 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
-      final googleProvider = GoogleAuthProvider();
-      // On Web/Chrome, signInWithPopup works natively and immediately
-      await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      if (kIsWeb) {
+        final googleProvider = GoogleAuthProvider();
+        await FirebaseAuth.instance.signInWithPopup(googleProvider);
+      } else {
+        const serverClientId =
+            '367329738936-1bsp1421ecuddfugtgiid5ftf03hv7uf.apps.googleusercontent.com';
+        final googleSignIn = GoogleSignIn.instance;
+        try {
+          await googleSignIn.initialize(
+            serverClientId: serverClientId,
+          );
+        } catch (_) {
+          // Já inicializado
+        }
+
+        final account = await googleSignIn.authenticate();
+        final idToken = account.authentication.idToken;
+
+        String? accessToken;
+        try {
+          final authz = await account.authorizationClient
+              .authorizeScopes(['email', 'profile']);
+          accessToken = authz.accessToken;
+        } catch (_) {}
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: accessToken,
+          idToken: idToken,
+        );
+
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        // Usuário cancelou a seleção da conta
+        return;
+      }
+      debugPrint('[LOGIN] GoogleSignInException: ${e.code} - ${e.description}');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Erro no Google Sign-In (${e.code.name}): ${e.description ?? ""}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'popup-closed-by-user') {
-        // Ignorar se o usuário fechou o popup intencionalmente
+      if (e.code == 'popup-closed-by-user' || e.code == 'canceled') {
+        // Ignorar cancelamento voluntário
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -35,10 +82,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     } catch (e) {
+      debugPrint('[LOGIN] Erro no Google Sign-In: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro inesperado no login: $e'),
+            content: Text('Erro no login: $e'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
