@@ -16,6 +16,7 @@ import '../../songs/models/song_setlist.dart';
 import '../../midi/widgets/midi_settings_dialog.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../widgets/app_menu.dart';
+import '../../chord_ai/widgets/chord_ai_dialog.dart';
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -156,6 +157,46 @@ E os acordes [G]entre colchetes
                             Text(
                               'Escrever no Editor',
                               style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.pop(context);
+                        ChordAiDialog.show(context);
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.purple.withOpacity(0.18), Colors.indigo.withOpacity(0.08)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(color: Colors.purpleAccent.withOpacity(0.5), width: 1.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.auto_awesome, color: Colors.purpleAccent, size: 40),
+                            SizedBox(height: 16),
+                            Text(
+                              'Detector Chord AI',
+                              style: TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 16),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'Ouvir no Microfone',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
                               textAlign: TextAlign.center,
                             ),
                           ],

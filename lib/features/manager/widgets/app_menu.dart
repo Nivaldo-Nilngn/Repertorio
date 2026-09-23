@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/manager_providers.dart';
+import '../../chord_ai/widgets/chord_ai_dialog.dart';
 
 class MenuItemData {
   final IconData icon;
@@ -122,6 +123,19 @@ class _AppMenuState extends ConsumerState<AppMenu> {
           // Actions Section (Right)
           Row(
             children: [
+              FilledButton.icon(
+                onPressed: () => ChordAiDialog.show(context),
+                icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.purpleAccent),
+                label: const Text('Chord AI'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.purple.withOpacity(0.15),
+                  foregroundColor: Colors.purpleAccent,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              ),
+              const SizedBox(width: 8),
               if (isCompact)
                 IconButton.filled(
                   onPressed: widget.onAddSong,
@@ -304,6 +318,31 @@ class _AppMenuState extends ConsumerState<AppMenu> {
                           Icon(Icons.add),
                           SizedBox(width: 8),
                           Text('Adicionar Música'),
+                        ],
+                      ),
+              ),
+            ),
+            
+            // Botão Chord AI Detector
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8.0 : 16.0, vertical: 2.0),
+              child: FilledButton.tonal(
+                onPressed: () => ChordAiDialog.show(context),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 40),
+                  backgroundColor: Colors.purple.withOpacity(0.15),
+                  foregroundColor: Colors.purpleAccent,
+                  padding: isCollapsed ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: isCollapsed
+                    ? const Icon(Icons.auto_awesome, size: 20)
+                    : const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.auto_awesome, size: 18),
+                          SizedBox(width: 8),
+                          Text('Chord AI', style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
               ),

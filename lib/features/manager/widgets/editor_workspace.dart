@@ -12,6 +12,7 @@ import '../../songs/services/cifra_club_parser.dart';
 import '../../songs/utils/chord_pro_parser.dart';
 import '../../songs/utils/chord_transposer.dart';
 import '../../songs/utils/harmonic_field_calculator.dart';
+import '../../chord_ai/widgets/chord_ai_dialog.dart';
 
 enum ChordFormat { chordPro, text }
 
@@ -1876,6 +1877,22 @@ E os acordes [G]entre colchetes
                               onPressed: () => _showAddMedleyDialog(context),
                               icon: const Icon(Icons.library_music, size: 18),
                               label: const Text('+ Medley / Juntar Música'),
+                              style: FilledButton.styleFrom(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                              ),
+                            ),
+                            FilledButton.tonalIcon(
+                              onPressed: () {
+                                ChordAiDialog.show(
+                                  context,
+                                  onInsertToEditor: (generatedChords) {
+                                    _insertText(' $generatedChords ');
+                                  },
+                                );
+                              },
+                              icon: const Icon(Icons.auto_awesome, size: 18, color: Colors.purpleAccent),
+                              label: const Text('Chord AI'),
                               style: FilledButton.styleFrom(
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 padding: const EdgeInsets.symmetric(horizontal: 16),
