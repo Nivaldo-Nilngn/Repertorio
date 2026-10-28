@@ -7,7 +7,7 @@ import '../../../core/theme/prefs_sync_state.dart';
 import '../../../core/theme/settings_provider.dart';
 import '../../songs/models/song_setlist.dart';
 
-enum SidebarTab { songs, prepare, artists, favorites, settings }
+enum SidebarTab { songs, prepare, artists, favorites, settings, chordAi }
 
 class SongFilter {
   final String? folderId;

@@ -1,0 +1,13 @@
+services:
+  chord-api:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      API_KEY: ""
+      MAX_DURATION: "600"
+      MAX_CONCURRENT: "2"
+    volumes:
+      - chord_cache:/data
+    restart: unless-stopped
+volumes:
+  chord_cache:

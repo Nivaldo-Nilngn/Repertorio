@@ -17,6 +17,7 @@ import '../../midi/widgets/midi_settings_dialog.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../widgets/app_menu.dart';
 import '../../chord_ai/widgets/chord_ai_dialog.dart';
+import '../../chord_ai/widgets/chord_ai_workspace.dart';
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -169,7 +170,7 @@ E os acordes [G]entre colchetes
                     child: InkWell(
                       onTap: () {
                         Navigator.pop(context);
-                        ChordAiDialog.show(context);
+                        ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.chordAi);
                       },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
@@ -543,7 +544,8 @@ E os acordes [G]entre colchetes
       case SidebarTab.favorites:
         return 3;
       case SidebarTab.settings:
-        return 0; // TODO: Settings is not in bottom nav yet
+      case SidebarTab.chordAi:
+        return 0; 
     }
   }
 
@@ -624,6 +626,11 @@ E os acordes [G]entre colchetes
         break;
       case SidebarTab.settings:
         workspace = const SettingsWorkspace();
+        break;
+      case SidebarTab.chordAi:
+        workspace = ChordAiWorkspace(
+          onClose: () => ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.songs),
+        );
         break;
     }
 

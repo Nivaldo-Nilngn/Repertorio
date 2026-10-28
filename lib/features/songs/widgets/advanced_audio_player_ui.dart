@@ -7,12 +7,18 @@ class AdvancedAudioPlayerUI extends StatefulWidget {
   final String title;
   final String artist;
   final String youtubeUrl; // e.g., https://www.youtube.com/watch?v=...
+  final VoidCallback? onPlay;
+  final VoidCallback? onPause;
+  final Future<void> Function()? onAudioLoaded;
 
   const AdvancedAudioPlayerUI({
     Key? key,
     required this.title,
     required this.artist,
     required this.youtubeUrl,
+    this.onPlay,
+    this.onPause,
+    this.onAudioLoaded,
   }) : super(key: key);
 
   @override
@@ -54,11 +60,19 @@ class _AdvancedAudioPlayerUIState extends State<AdvancedAudioPlayerUI> {
           _statusMessage = 'Carregando engine de áudio...';
         });
 
-        js_audio.initAudioPlayer(b2Url, () {
+        js_audio.initAudioPlayer(b2Url, () async {
           if (mounted) {
             setState(() {
-              _isLoading = false;
+              _statusMessage = 'Analisando acordes...';
             });
+            if (widget.onAudioLoaded != null) {
+              await widget.onAudioLoaded!();
+            }
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
           }
         });
       } else {
@@ -79,8 +93,10 @@ class _AdvancedAudioPlayerUIState extends State<AdvancedAudioPlayerUI> {
     });
     if (_isPlaying) {
       js_audio.playAudio();
+      if (widget.onPlay != null) widget.onPlay!();
     } else {
       js_audio.pauseAudio();
+      if (widget.onPause != null) widget.onPause!();
     }
   }
 
@@ -110,95 +126,146 @@ class _AdvancedAudioPlayerUIState extends State<AdvancedAudioPlayerUI> {
     }
 
     return Material(
-      elevation: 12,
-      borderRadius: BorderRadius.circular(12),
-      color: const Color(0xFF161616), // Dark premium background
+      elevation: 0,
+      color: Colors.transparent, // Background handled by parent
       child: Container(
-        width: 340,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Header
-            Row(
-              children: [
-                const Icon(Icons.music_note, color: Colors.greenAccent, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      Text(widget.artist, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-                    ],
+            // Thumbnail / Icon
+            Container(
+              width: 80,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.music_note, color: Colors.greenAccent, size: 32),
+            ),
+            const SizedBox(width: 16),
+            
+            // Title & Artist
+            Expanded(
+              flex: 3,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(widget.artist, style: const TextStyle(color: Colors.white54, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            
+            // Sliders
+            Expanded(
+              flex: 4,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Transpose
+                  _buildCompactSliderControl(
+                    label: 'Transpose / Pitch',
+                    value: _pitch,
+                    min: -12,
+                    max: 12,
+                    divisions: 24,
+                    displayValue: _pitch == 0 ? 'Original' : (_pitch > 0 ? '+${_pitch.toInt()}' : '${_pitch.toInt()}'),
+                    onChanged: (val) {
+                      setState(() => _pitch = val);
+                      js_audio.setPitch(val);
+                    },
                   ),
-                ),
-              ],
+                  // Speed
+                  _buildCompactSliderControl(
+                    label: 'Velocidade',
+                    value: _speed,
+                    min: 0.5,
+                    max: 1.5,
+                    displayValue: '${(_speed * 100).toInt()}%',
+                    onChanged: (val) {
+                      setState(() => _speed = val);
+                      js_audio.setSpeed(val);
+                    },
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-
-            // Transpose / Pitch Control
-            _buildSliderControl(
-              label: 'Transpose / Pitch',
-              value: _pitch,
-              min: -12,
-              max: 12,
-              divisions: 24,
-              displayValue: _pitch == 0 ? 'Original' : (_pitch > 0 ? '+${_pitch.toInt()}' : '${_pitch.toInt()}'),
-              onChanged: (val) {
-                setState(() => _pitch = val);
-                js_audio.setPitch(val);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Speed Control
-            _buildSliderControl(
-              label: 'Velocidade',
-              value: _speed,
-              min: 0.5,
-              max: 1.5,
-              displayValue: '${(_speed * 100).toInt()}%',
-              onChanged: (val) {
-                setState(() => _speed = val);
-                js_audio.setSpeed(val);
-              },
-            ),
-            const SizedBox(height: 24),
-
+            
             // Playback Controls
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.fast_rewind, color: Colors.white70),
-                  onPressed: () {},
-                ),
-                GestureDetector(
-                  onTap: _togglePlayPause,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.greenAccent,
-                    ),
-                    child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black, size: 32),
+            Expanded(
+              flex: 2,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.fast_rewind, color: Colors.white70),
+                    onPressed: () {
+                      final curr = js_audio.getAudioProgress();
+                      js_audio.seekAudio(curr > 15 ? curr - 15 : 0);
+                    },
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.fast_forward, color: Colors.white70),
-                  onPressed: () {},
-                ),
-              ],
+                  GestureDetector(
+                    onTap: _togglePlayPause,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.greenAccent,
+                      ),
+                      child: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black, size: 28),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.fast_forward, color: Colors.white70),
+                    onPressed: () {
+                      final curr = js_audio.getAudioProgress();
+                      js_audio.seekAudio(curr + 15);
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCompactSliderControl({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required String displayValue,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11))),
+        Expanded(
+          child: SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: Colors.greenAccent,
+              inactiveTrackColor: Colors.white10,
+              thumbColor: Colors.white,
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+            ),
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+        SizedBox(width: 50, child: Text(displayValue, style: const TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+      ],
     );
   }
 

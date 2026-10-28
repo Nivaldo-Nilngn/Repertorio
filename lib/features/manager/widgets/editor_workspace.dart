@@ -231,6 +231,40 @@ class _EditorWorkspaceState extends ConsumerState<EditorWorkspace> {
 
     try {
       await ref.read(songRepositoryProvider).createSong(song);
+
+      if (_selectedFolderId != null) {
+        final allSetlists = ref.read(setlistListProvider).value ?? [];
+        final matchedSetlist = allSetlists.where((s) => s.id == _selectedFolderId).firstOrNull;
+        if (matchedSetlist != null) {
+          final existingIndex = matchedSetlist.items.indexWhere(
+            (item) => (item.songId != null && item.songId == song.id) ||
+                item.title.trim().toLowerCase() == song.title.trim().toLowerCase(),
+          );
+          if (existingIndex != -1) {
+            final updatedItems = List<SetlistItem>.from(matchedSetlist.items);
+            updatedItems[existingIndex] = updatedItems[existingIndex].copyWith(
+              key: song.key,
+              title: song.title,
+              subtitle: song.artist,
+              songId: song.id,
+            );
+            await ref.read(songRepositoryProvider).updateSetlist(
+              matchedSetlist.copyWith(items: updatedItems),
+            );
+          } else {
+            final newItem = SetlistItem(
+              type: 'song',
+              title: song.title,
+              subtitle: song.artist,
+              key: song.key,
+              songId: song.id,
+            );
+            await ref.read(songRepositoryProvider).updateSetlist(
+              matchedSetlist.copyWith(items: [...matchedSetlist.items, newItem]),
+            );
+          }
+        }
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Música salva no Firebase!'), backgroundColor: Colors.green),

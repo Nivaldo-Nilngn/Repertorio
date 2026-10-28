@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../songs/repositories/song_repository.dart';
 import '../providers/manager_providers.dart';
+import '../../songs/utils/song_search_utility.dart';
 
 class ArtistsWorkspace extends ConsumerStatefulWidget {
   const ArtistsWorkspace({super.key});
@@ -89,9 +90,15 @@ class _ArtistsWorkspaceState extends ConsumerState<ArtistsWorkspace> {
                   }
 
                   var allArtists = artistCounts.keys.toList()..sort();
-                  if (_searchQuery.isNotEmpty) {
+                  if (_searchQuery.trim().isNotEmpty) {
+                    final normQ = SongSearchUtility.normalize(_searchQuery.trim());
+                    final compQ = SongSearchUtility.compact(_searchQuery);
                     allArtists = allArtists
-                        .where((a) => a.toLowerCase().contains(_searchQuery))
+                        .where((a) {
+                          final normA = SongSearchUtility.normalize(a);
+                          final compA = SongSearchUtility.compact(a);
+                          return normA.contains(normQ) || (compQ.isNotEmpty && compA.contains(compQ));
+                        })
                         .toList();
                   }
 

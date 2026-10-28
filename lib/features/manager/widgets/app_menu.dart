@@ -124,7 +124,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
           Row(
             children: [
               FilledButton.icon(
-                onPressed: () => ChordAiDialog.show(context),
+                onPressed: () => ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.chordAi),
                 icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.purpleAccent),
                 label: const Text('Chord AI'),
                 style: FilledButton.styleFrom(
@@ -327,7 +327,7 @@ class _AppMenuState extends ConsumerState<AppMenu> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 8.0 : 16.0, vertical: 2.0),
               child: FilledButton.tonal(
-                onPressed: () => ChordAiDialog.show(context),
+                onPressed: () => ref.read(sidebarTabProvider.notifier).setTab(SidebarTab.chordAi),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, 40),
                   backgroundColor: Colors.purple.withOpacity(0.15),

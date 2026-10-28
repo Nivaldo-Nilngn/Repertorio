@@ -4,14 +4,28 @@
     {
       "label": "Gerar dart defines do .env",
       "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}/.vscode/scripts/build_env_json.ps1"
-      ],
+      "windows": {
+        "command": "powershell",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder}/.vscode/scripts/build_env_json.ps1"
+        ]
+      },
+      "linux": {
+        "command": "bash",
+        "args": [
+          "${workspaceFolder}/.vscode/scripts/build_env_json.sh"
+        ]
+      },
+      "osx": {
+        "command": "bash",
+        "args": [
+          "${workspaceFolder}/.vscode/scripts/build_env_json.sh"
+        ]
+      },
       "problemMatcher": [],
       "presentation": {
         "reveal": "silent"

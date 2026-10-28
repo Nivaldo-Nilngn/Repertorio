@@ -276,9 +276,13 @@ class CifraClubParser {
     final rawItems = <_ParsedItem>[];
 
     for (final div in kvmvDivs) {
-      final inner = div.innerHtml;
-      final lines = inner.split('\n');
+      final sanitizedInner = div.innerHtml.replaceAllMapped(
+        RegExp(r'<[^>]*>', dotAll: true),
+        (match) => match.group(0)!.replaceAll('\n', ' ').replaceAll('\r', ''),
+      );
+      final lines = sanitizedInner.split('\n');
       for (var l in lines) {
+        l = l.replaceAll('\u200b', '').replaceAll('\ufeff', '');
         final trimmed = l.trim();
         if (trimmed.isEmpty) continue;
 

@@ -6,6 +6,7 @@ import '../../songs/models/song_setlist.dart';
 import '../../songs/repositories/song_repository.dart';
 import '../providers/manager_providers.dart';
 import '../providers/editor_provider.dart';
+import '../../songs/utils/song_search_utility.dart';
 
 class ArrangeWorkspace extends ConsumerStatefulWidget {
   final VoidCallback? onAddSong;
@@ -1445,10 +1446,16 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
               ),
               const SizedBox(height: 16),
               TextField(
-                onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
+                onChanged: (v) => setState(() => _searchQuery = v),
                 decoration: InputDecoration(
-                  hintText: 'Buscar músicas, artistas...',
+                  hintText: 'Buscar músicas, artistas, letras...',
                   prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _searchQuery = ''),
+                        )
+                      : null,
                   filled: true,
                   fillColor: colors.surfaceContainer,
                   border: OutlineInputBorder(
@@ -1464,11 +1471,7 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
         Expanded(
           child: songAsync.when(
             data: (songs) {
-              final filteredSongs = songs.where((s) {
-                final query = _searchQuery.trim();
-                if (query.isEmpty) return true;
-                return s.title.toLowerCase().contains(query) || s.artist.toLowerCase().contains(query);
-              }).toList()..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+              final filteredSongs = SongSearchUtility.filterAndRank(songs, _searchQuery);
 
               if (filteredSongs.isEmpty) {
                 return const Center(child: Text('Nenhuma música encontrada.'));
@@ -1645,35 +1648,44 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Voltar para a Lista',
-                    onPressed: () {
-                      setState(() {
-                        _activeSetlist = null;
-                        _isDirty = false;
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+              Expanded(
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Voltar para a Lista',
+                      onPressed: () {
+                        setState(() {
+                          _activeSetlist = null;
+                          _isDirty = false;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_activeSetlist!.name, style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 32)),
-                          const SizedBox(width: 8),
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 22),
-                            onPressed: () => _showEditSetlistDialog(_activeSetlist!),
-                            tooltip: 'Editar Repertório',
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _activeSetlist!.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 32),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                icon: const Icon(Icons.edit, size: 22),
+                                onPressed: () => _showEditSetlistDialog(_activeSetlist!),
+                                tooltip: 'Editar Repertório',
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
+                          const SizedBox(height: 8),
                       Row(
                         children: [
                           Icon(Icons.calendar_today, size: 16, color: colors.onSurfaceVariant),
@@ -1687,9 +1699,12 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                       ),
                     ],
                   ),
-                ],
-              ),
-              Row(
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Row(
                 children: [
                   if (_isDirty)
                     FilledButton.icon(
@@ -1786,7 +1801,8 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
   Widget _buildSetlistSongItem(int index, SetlistItem item, ColorScheme colors) {
     final stripColor = item.colorHex != null ? Color(int.parse(item.colorHex!.replaceFirst('#', '0xFF'))) : const Color(0xFFffb95f);
     final savedSongs = ref.watch(songListProvider).value ?? [];
-    final isMissing = !savedSongs.any((s) => (item.songId != null && item.songId == s.id) || item.title.trim().toLowerCase() == s.title.trim().toLowerCase());
+    final matchingSong = savedSongs.where((s) => (item.songId != null && item.songId == s.id) || item.title.trim().toLowerCase() == s.title.trim().toLowerCase()).firstOrNull;
+    final isMissing = matchingSong == null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1853,18 +1869,65 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                     // Action row
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surfaceContainer,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: colors.outline.withOpacity(0.5)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Text('Tom ', style: TextStyle(color: Color(0xFFffb95f), fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
-                              Text(item.key.isEmpty ? 'C' : item.key, style: const TextStyle(fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
-                            ],
+                        PopupMenuButton<String>(
+                          tooltip: 'Alterar Tom da Música no Repertório',
+                          onSelected: (newKey) async {
+                            final items = List<SetlistItem>.from(_activeSetlist!.items);
+                            items[index] = items[index].copyWith(key: newKey);
+                            setState(() {
+                              _activeSetlist = _activeSetlist!.copyWith(items: items);
+                              _isDirty = true;
+                            });
+                            await ref.read(songRepositoryProvider).updateSetlist(_activeSetlist!);
+                            if (mounted) {
+                              setState(() {
+                                _isDirty = false;
+                              });
+                            }
+                          },
+                          itemBuilder: (context) {
+                            const keys = [
+                              'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B',
+                              'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm', 'Abm', 'Am', 'Bbm', 'Bm'
+                            ];
+                            final currentKey = item.key.isEmpty ? (matchingSong?.key ?? 'C') : item.key;
+                            return keys.map((k) {
+                              return PopupMenuItem<String>(
+                                value: k,
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      k,
+                                      style: TextStyle(
+                                        fontWeight: k == currentKey ? FontWeight.bold : FontWeight.normal,
+                                        color: k == currentKey ? colors.primary : colors.onSurface,
+                                      ),
+                                    ),
+                                    if (k == currentKey) ...[
+                                      const Spacer(),
+                                      Icon(Icons.check, size: 16, color: colors.primary),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surfaceContainer,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFffb95f).withOpacity(0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Tom ', style: TextStyle(color: Color(0xFFffb95f), fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
+                                Text(item.key.isEmpty ? (matchingSong?.key ?? 'C') : item.key, style: const TextStyle(fontFamily: 'Consolas', fontWeight: FontWeight.bold, fontSize: 11)),
+                                const SizedBox(width: 2),
+                                Icon(Icons.arrow_drop_down, size: 14, color: colors.onSurfaceVariant),
+                              ],
+                            ),
                           ),
                         ),
                         const Spacer(),
@@ -1874,12 +1937,18 @@ class _ArrangeWorkspaceState extends ConsumerState<ArrangeWorkspace> {
                           tooltip: 'Editar Música',
                           padding: const EdgeInsets.all(4),
                           constraints: const BoxConstraints(),
-                          onPressed: () {
+                          onPressed: () async {
+                            if (_isDirty && _activeSetlist != null) {
+                              await ref.read(songRepositoryProvider).updateSetlist(_activeSetlist!);
+                              if (mounted) setState(() => _isDirty = false);
+                            }
                             final songs = ref.read(songListProvider).value ?? [];
                             try {
-                              final matchingSong = songs.firstWhere((s) => s.title == item.title);
-                              ref.read(selectedSongIdProvider.notifier).select(matchingSong.id);
-                              ref.read(editingChordProProvider.notifier).state = matchingSong.content;
+                              final matching = songs.firstWhere((s) =>
+                                  (item.songId != null && s.id == item.songId) ||
+                                  s.title.trim().toLowerCase() == item.title.trim().toLowerCase());
+                              ref.read(selectedSongIdProvider.notifier).select(matching.id);
+                              ref.read(editingChordProProvider.notifier).state = matching.content;
                               // Memoriza aba atual para restaurar ao salvar
                               ref.read(editorOriginTabProvider.notifier).setOrigin(
                                   ref.read(sidebarTabProvider));

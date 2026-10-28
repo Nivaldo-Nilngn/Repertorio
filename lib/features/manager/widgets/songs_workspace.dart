@@ -15,6 +15,7 @@ import '../../songs/utils/harmonic_field_calculator.dart';
 import '../../songs/utils/chord_converter_utility.dart';
 import 'cifraclub_importer.dart';
 import '../../midi/providers/midi_providers.dart';
+import '../../songs/utils/song_search_utility.dart';
 
 enum ChordFormat { chordPro, text, traditional }
 
@@ -598,8 +599,22 @@ class _SongsWorkspaceState extends ConsumerState<SongsWorkspace> {
         final allSetlists = ref.read(setlistListProvider).value ?? [];
         final matchedSetlist = allSetlists.where((s) => s.id == _selectedFolderId).firstOrNull;
         if (matchedSetlist != null) {
-          final alreadyExists = matchedSetlist.items.any((item) => item.songId == song.id);
-          if (!alreadyExists) {
+          final existingIndex = matchedSetlist.items.indexWhere(
+            (item) => (item.songId != null && item.songId == song.id) ||
+                item.title.trim().toLowerCase() == song.title.trim().toLowerCase(),
+          );
+          if (existingIndex != -1) {
+            final updatedItems = List<SetlistItem>.from(matchedSetlist.items);
+            updatedItems[existingIndex] = updatedItems[existingIndex].copyWith(
+              key: song.key,
+              title: song.title,
+              subtitle: song.artist,
+              songId: song.id,
+            );
+            await ref.read(songRepositoryProvider).updateSetlist(
+              matchedSetlist.copyWith(items: updatedItems),
+            );
+          } else {
             final newItem = SetlistItem(
               type: 'song',
               title: song.title,
@@ -1123,9 +1138,9 @@ E os acordes [G]entre colchetes
 
     final filteredSongs = savedSongs.where((song) {
       if (_searchQuery.isNotEmpty) {
-        final matchesTitle = song.title.toLowerCase().contains(_searchQuery);
-        final matchesArtist = song.artist.toLowerCase().contains(_searchQuery);
-        return matchesTitle || matchesArtist;
+        if (!SongSearchUtility.matches(song, _searchQuery)) {
+          return false;
+        }
       }
 
       if (activeTab == SidebarTab.favorites || filter.onlyFavorites) {
@@ -1161,6 +1176,18 @@ E os acordes [G]entre colchetes
       }
       return true;
     }).toList();
+
+    if (_searchQuery.isNotEmpty) {
+      filteredSongs.sort((a, b) {
+        final scoreA = SongSearchUtility.relevanceScore(a, _searchQuery);
+        final scoreB = SongSearchUtility.relevanceScore(b, _searchQuery);
+        if (scoreA != scoreB) {
+          return scoreB.compareTo(scoreA);
+        }
+        return SongSearchUtility.normalize(a.title)
+            .compareTo(SongSearchUtility.normalize(b.title));
+      });
+    }
 
     if (filter.folderId != null && _searchQuery.isEmpty) {
       final matchingSetlist = setlists

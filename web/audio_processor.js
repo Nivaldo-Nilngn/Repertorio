@@ -33,8 +33,9 @@ window.AdvancedAudioPlayerJS = {
 
   play: function () {
     if (!this.isInitialized) return;
-    Tone.start(); // Required by browsers to start audio context
-    this.player.start();
+    Tone.start(); 
+    this.player.start(0, this.pauseOffset || 0);
+    this.playbackStartTime = this.player.context.currentTime - (this.pauseOffset || 0);
     this.isPlaying = true;
   },
 
@@ -42,6 +43,9 @@ window.AdvancedAudioPlayerJS = {
     if (!this.isInitialized) return;
     this.player.stop();
     this.isPlaying = false;
+    if (this.playbackStartTime !== undefined) {
+      this.pauseOffset = this.player.context.currentTime - this.playbackStartTime;
+    }
   },
 
   setPitch: function (semitones) {
@@ -52,14 +56,17 @@ window.AdvancedAudioPlayerJS = {
   setSpeed: function (rate) {
     if (!this.isInitialized) return;
     this.player.playbackRate = rate;
+    // We would need to update playbackStartTime relative to speed changes for perfect sync,
+    // but for now let's just apply the speed.
   },
 
   seek: function (timeInSeconds) {
     if (!this.isInitialized) return;
-    // Tone.Player start method takes the offset
+    this.pauseOffset = timeInSeconds;
     if (this.isPlaying) {
       this.player.stop();
       this.player.start(0, timeInSeconds);
+      this.playbackStartTime = this.player.context.currentTime - timeInSeconds;
     }
   },
   
@@ -75,12 +82,22 @@ window.AdvancedAudioPlayerJS = {
   },
   
   getProgress: function() {
-    if (!this.isInitialized || !this.isPlaying) return 0;
-    // Tone.Player state tracking
-    // There isn't a direct get currentTime on Player, so we calculate
-    // We will implement basic state mapping if needed
-    // But usually Dart can manage its own timer if needed, or we expose context time.
-    return this.player.state === "started" ? this.player.context.currentTime : 0; 
+    if (!this.isInitialized) return 0;
+    if (!this.isPlaying) return this.pauseOffset || 0;
+    return this.player.context.currentTime - this.playbackStartTime; 
+  },
+
+  getRawPCMData: function () {
+    if (!this.isInitialized || !this.player || !this.player.buffer) return null;
+    const audioBuffer = this.player.buffer.get();
+    if (!audioBuffer) return null;
+    return audioBuffer.getChannelData(0); // Float32Array, canal 0 (mono/esquerdo)
+  },
+
+  getSampleRateOfBuffer: function () {
+    if (!this.isInitialized || !this.player || !this.player.buffer) return 44100;
+    const audioBuffer = this.player.buffer.get();
+    return audioBuffer ? audioBuffer.sampleRate : 44100;
   }
 };
 
@@ -110,8 +127,10 @@ window.ChordAiAudioJS = {
       }
       const source = this.audioContext.createMediaStreamSource(stream);
       this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 2048;
+      this.analyser.fftSize = 8192;
       this.analyser.smoothingTimeConstant = 0.6;
+      this.analyser.minDecibels = -70;
+      this.analyser.maxDecibels = 0;
       source.connect(this.analyser);
       this.buffer = new Uint8Array(this.analyser.frequencyBinCount);
       this.isCapturing = true;
@@ -140,14 +159,45 @@ window.ChordAiAudioJS = {
       } catch (_) {}
       this.mediaStream = null;
     }
-    if (this.audioContext) {
+    // Only close audioContext if it was created by us for microphone
+    if (this.audioContext && !this.usingToneContext) {
       try {
         this.audioContext.close();
       } catch (_) {}
-      this.audioContext = null;
     }
+    this.usingToneContext = false;
+    this.audioContext = null;
     this.analyser = null;
     this.buffer = null;
+  },
+
+  startFromTone: async function() {
+    if (this.isCapturing) return true;
+    try {
+      if (!window.Tone || !window.Tone.getContext()) return false;
+      
+      this.audioContext = window.Tone.getContext().rawContext;
+      this.usingToneContext = true;
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 8192;
+      this.analyser.smoothingTimeConstant = 0.6;
+      this.analyser.minDecibels = -70;
+      this.analyser.maxDecibels = 0;
+      
+      // Connect directly from the player to avoid PitchShift artifacts in the FFT
+      if (window.AdvancedAudioPlayerJS && window.AdvancedAudioPlayerJS.player) {
+        window.AdvancedAudioPlayerJS.player.connect(this.analyser);
+      } else {
+        window.Tone.getDestination().connect(this.analyser);
+      }
+      
+      this.buffer = new Uint8Array(this.analyser.frequencyBinCount);
+      this.isCapturing = true;
+      return true;
+    } catch(e) {
+      console.error("[ChordAiAudioJS] startFromTone error:", e);
+      return false;
+    }
   }
 };
 

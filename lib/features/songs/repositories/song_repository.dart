@@ -101,12 +101,67 @@ class SongRepository {
 
 
 
+  Future<void> syncSongInSetlists(Song song) async {
+    try {
+      final snapshot = await _setlistsRef.get();
+      if (!snapshot.exists || snapshot.value == null) return;
+
+      final value = snapshot.value;
+      final Map<String, dynamic> setlistsMap = {};
+      if (value is Map) {
+        setlistsMap.addAll(Map<String, dynamic>.from(value));
+      } else if (value is List) {
+        for (int i = 0; i < value.length; i++) {
+          if (value[i] != null && value[i] is Map) {
+            setlistsMap[i.toString()] = Map<String, dynamic>.from(value[i] as Map);
+          }
+        }
+      }
+
+      for (final entry in setlistsMap.entries) {
+        if (entry.value is! Map) continue;
+        final setlistMap = Map<String, dynamic>.from(entry.value as Map);
+        final rawItems = setlistMap['items'];
+        if (rawItems is List) {
+          bool changed = false;
+          final updatedItems = rawItems.map((rawItem) {
+            if (rawItem is Map) {
+              final item = Map<String, dynamic>.from(rawItem);
+              final itemSongId = item['songId']?.toString();
+              final itemTitle = item['title']?.toString().trim().toLowerCase();
+              final matches = (itemSongId != null && itemSongId == song.id) ||
+                  (itemTitle != null && itemTitle == song.title.trim().toLowerCase());
+
+              if (matches) {
+                changed = true;
+                item['key'] = song.key;
+                item['title'] = song.title;
+                item['subtitle'] = song.artist;
+                item['songId'] = song.id;
+              }
+              return item;
+            }
+            return rawItem;
+          }).toList();
+
+          if (changed) {
+            await _setlistsRef.child(entry.key).child('items').set(updatedItems);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error syncing song in setlists: $e');
+    }
+  }
+
   Future<void> createSong(Song song) async {
     await _songsRef.child(song.id).set(song.toJson());
+    await syncSongInSetlists(song);
   }
 
   Future<void> updateSong(Song song) async {
     await _songsRef.child(song.id).update(song.toJson());
+    await syncSongInSetlists(song);
   }
 
   Future<void> deleteSong(String songId) async {
